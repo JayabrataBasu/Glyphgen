@@ -15,6 +15,7 @@ use ratatui::{
 };
 
 use crate::state::{AppState, FocusedWidget, RenderMode};
+use ratatui::widgets::Clear;
 
 /// Main render function - draws the entire UI
 pub fn render(frame: &mut Frame, state: &AppState) {
@@ -43,6 +44,11 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     // Render help overlay if active
     if state.show_help {
         help::render_help_overlay(frame, size);
+    }
+
+    // Render load prompt if active
+    if state.load_prompt_active {
+        render_load_prompt(frame, size, state);
     }
 }
 
@@ -264,4 +270,33 @@ fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
         .style(Style::default().bg(Color::Black).fg(Color::White));
 
     frame.render_widget(widget, area);
+}
+
+/// Render centered load prompt modal
+fn render_load_prompt(frame: &mut Frame, size: Rect, state: &AppState) {
+    // Modal sizing
+    let width = (size.width as f32 * 0.6) as u16;
+    let height = 5u16;
+    let x = (size.width - width) / 2;
+    let y = (size.height - height) / 2;
+    let area = Rect::new(x, y, width, height);
+
+    // Clear area under modal
+    frame.render_widget(Clear, area);
+
+    let border = Block::default().borders(Borders::ALL).title(Span::styled(
+        " Load Image ",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+
+    let mut lines = Vec::new();
+    lines.push(Line::from(Span::raw("Enter path to image and press Enter:")));
+    lines.push(Line::from(Span::raw(format!("{}", state.load_prompt_input))));
+
+    if let Some(ref err) = state.load_prompt_error {
+        lines.push(Line::from(Span::styled(err, Style::default().fg(Color::Red))));
+    }
+
+    let paragraph = Paragraph::new(lines).block(border);
+    frame.render_widget(paragraph, area);
 }

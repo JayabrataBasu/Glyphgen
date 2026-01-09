@@ -268,6 +268,11 @@ pub struct AppState {
     // Configuration
     pub config: Config,
 
+    // Interactive load prompt (when pressing [L])
+    pub load_prompt_active: bool,
+    pub load_prompt_input: String,
+    pub load_prompt_error: Option<String>,
+
     // Worker communication
     worker_tx: Sender<WorkerMessage>,
 }
@@ -320,6 +325,12 @@ impl AppState {
             is_rendering: false,
 
             config,
+
+            // Load prompt defaults
+            load_prompt_active: false,
+            load_prompt_input: String::new(),
+            load_prompt_error: None,
+
             worker_tx,
         }
     }
@@ -356,6 +367,11 @@ impl AppState {
         self.input_image = Some(Arc::new(image));
         self.set_status(&format!("Loaded: {}", filename), false);
         self.preview_content = None;
+
+        // Clear any load prompt state
+        self.load_prompt_active = false;
+        self.load_prompt_input.clear();
+        self.load_prompt_error = None;
 
         // Auto-render after loading
         self.trigger_render();
@@ -448,6 +464,11 @@ impl AppState {
                 self.set_status(&format!("Error: {}", err), true);
             }
         }
+
+        // If a load prompt was active and a worker returned an error, show the error message
+        if let Some(err) = self.load_prompt_error.clone() {
+            self.set_status(&err, true);
+        }
     }
 
     /// Get current mode's selected setting index
@@ -456,6 +477,49 @@ impl AppState {
             RenderMode::ImageToAscii => self.ascii_state.selected_setting,
             RenderMode::ImageToUnicode => self.unicode_state.selected_setting,
             RenderMode::TextStylizer => self.text_state.selected_setting,
+        }
+    }
+
+    /// Start the interactive load prompt (shows a modal for path input)
+    pub fn start_load_prompt(&mut self) {
+        self.load_prompt_active = true;
+        self.load_prompt_input.clear();
+        self.load_prompt_error = None;
+        self.set_status("Enter image path and press Enter", false);
+    }
+
+    /// Cancel the interactive load prompt
+    pub fn cancel_load_prompt(&mut self) {
+        self.load_prompt_active = false;
+        self.load_prompt_input.clear();
+        self.load_prompt_error = None;
+        self.set_status("Load cancelled", false);
+    }
+
+    /// Attempt to load the image from the prompt input
+    pub fn submit_load_prompt(&mut self) {
+        let input = self.load_prompt_input.trim();
+        if input.is_empty() {
+            self.load_prompt_error = Some("Path is empty".to_string());
+            self.set_status("Path is empty", true);
+            return;
+        }
+
+        let path = PathBuf::from(input);
+        if !path.exists() {
+            self.load_prompt_error = Some("File not found".to_string());
+            self.set_status("File not found", true);
+            return;
+        }
+
+        match crate::image_loader::load_image(&path) {
+            Ok(img) => {
+                self.set_input_image(path, img);
+            }
+            Err(e) => {
+                self.load_prompt_error = Some(format!("Failed to load: {}", e));
+                self.set_status(&format!("Failed to load: {}", e), true);
+            }
         }
     }
 

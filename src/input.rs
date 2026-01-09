@@ -26,6 +26,11 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
         return handle_help_input(key, state);
     }
 
+    // Handle interactive load prompt
+    if state.load_prompt_active {
+        return handle_load_prompt_input(key, state);
+    }
+
     // Handle text input mode
     if state.text_state.editing_text {
         return handle_text_input(key, state);
@@ -95,6 +100,26 @@ fn handle_text_input(key: KeyEvent, state: &mut AppState) -> Result<()> {
     Ok(())
 }
 
+/// Handle input for the interactive load prompt
+fn handle_load_prompt_input(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            state.cancel_load_prompt();
+        }
+        KeyCode::Enter => {
+            state.submit_load_prompt();
+        }
+        KeyCode::Backspace => {
+            state.load_prompt_input.pop();
+        }
+        KeyCode::Char(c) => {
+            state.load_prompt_input.push(c);
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 /// Handle input for mode selector widget
 fn handle_mode_selector_input(key: KeyEvent, state: &mut AppState) -> Result<()> {
     match key.code {
@@ -132,7 +157,9 @@ fn handle_mode_selector_input(key: KeyEvent, state: &mut AppState) -> Result<()>
         }
 
         // Common actions
-        KeyCode::Char('l') | KeyCode::Char('L') => load_image_dialog(state)?,
+        KeyCode::Char('l') | KeyCode::Char('L') => {
+            state.start_load_prompt();
+        }
         KeyCode::Char(' ') => state.trigger_render(),
         KeyCode::Char('s') | KeyCode::Char('S') => save_output(state)?,
 
@@ -172,7 +199,9 @@ fn handle_control_panel_input(key: KeyEvent, state: &mut AppState) -> Result<()>
         }
 
         // Actions
-        KeyCode::Char('L') => load_image_dialog(state)?,
+        KeyCode::Char('L') => {
+            state.start_load_prompt();
+        }
         KeyCode::Char('S') => save_output(state)?,
 
         _ => {}
@@ -199,7 +228,9 @@ fn handle_preview_input(key: KeyEvent, state: &mut AppState) -> Result<()> {
         // Actions
         KeyCode::Char('s') | KeyCode::Char('S') => save_output(state)?,
         KeyCode::Char('c') | KeyCode::Char('C') => copy_to_clipboard(state)?,
-        KeyCode::Char('l') | KeyCode::Char('L') => load_image_dialog(state)?,
+        KeyCode::Char('l') | KeyCode::Char('L') => {
+            state.start_load_prompt();
+        }
         KeyCode::Char(' ') => state.trigger_render(),
 
         _ => {}

@@ -35,8 +35,31 @@ fn main() -> Result<()> {
         original_hook(panic_info);
     }));
 
-    // Initialize terminal
-    let mut terminal = setup_terminal()?;
+    // If --render-once is used we don't want to enter a full TUI (handled below),
+    // so we only set up the terminal when needed later.
+
+    // Simple CLI parsing for convenience
+    let mut arg_image: Option<std::path::PathBuf> = None;
+    let mut arg_render_once = false;
+    let mut arg_mode: Option<String> = None;
+
+    let mut iter = std::env::args().skip(1);
+    while let Some(a) = iter.next() {
+        match a.as_str() {
+            "--image" => {
+                if let Some(p) = iter.next() {
+                    arg_image = Some(std::path::PathBuf::from(p));
+                }
+            }
+            "--render-once" => arg_render_once = true,
+            "--mode" => {
+                if let Some(m) = iter.next() {
+                    arg_mode = Some(m);
+                }
+            }
+            _ => {}
+        }
+    }
 
     // Detect terminal capabilities
     let capabilities = detect_capabilities();
@@ -47,8 +70,24 @@ fn main() -> Result<()> {
     // Spawn worker threads
     let workers = spawn_workers();
 
+    // If render-once was requested, do not start full TUI — perform a single render + save
+    if arg_render_once && arg_image.is_some() {
+        return run_render_once(arg_image.unwrap(), arg_mode.as_deref(), &config, &workers);
+    }
+
     // Create application state
     let mut app_state = AppState::new(config, capabilities, workers.request_tx.clone());
+
+    // If an image path was provided, set it (this will auto-render)
+    if let Some(path) = arg_image {
+        match glyphgen::image_loader::load_image(&path) {
+            Ok(img) => app_state.set_input_image(path, img),
+            Err(e) => eprintln!("Failed to load image: {}", e),
+        }
+    }
+
+    // Initialize terminal (only needed for interactive TUI)
+    let mut terminal = setup_terminal()?;
 
     // Run main event loop
     let result = run_event_loop(&mut terminal, &mut app_state, &workers);
@@ -130,6 +169,92 @@ fn run_event_loop(
     // Save configuration on exit
     if let Err(e) = app_state.config.save() {
         eprintln!("Warning: Failed to save config: {}", e);
+    }
+
+    Ok(())
+}
+
+/// Render once: load image, request worker, wait for response, save output to file
+fn run_render_once(
+    image_path: std::path::PathBuf,
+    mode: Option<&str>,
+    config: &Config,
+    workers: &WorkerHandle,
+) -> Result<()> {
+    let img = glyphgen::image_loader::load_image(&image_path)?;
+
+    // Determine mode
+    let mode_enum = match mode.unwrap_or("ascii") {
+        "ascii" => glyphgen::state::RenderMode::ImageToAscii,
+        "unicode" => glyphgen::state::RenderMode::ImageToUnicode,
+        "text" => glyphgen::state::RenderMode::TextStylizer,
+        other => {
+            eprintln!("Unknown mode '{}', defaulting to ascii", other);
+            glyphgen::state::RenderMode::ImageToAscii
+        }
+    };
+
+    // Construct message based on mode
+    use glyphgen::worker::WorkerMessage;
+    let config_clone = config.clone();
+
+    match mode_enum {
+        glyphgen::state::RenderMode::ImageToAscii => {
+            let msg = WorkerMessage::AsciiRequest {
+                image: std::sync::Arc::new(img),
+                width: config_clone.ascii.default_width,
+                charset: glyphgen::render_engines::ascii::CharacterSet::Extended,
+                invert: false,
+                edge_enhance: config_clone.ascii.edge_enhance,
+            };
+            let _ = workers.request_tx.send(msg);
+        }
+        glyphgen::state::RenderMode::ImageToUnicode => {
+            let msg = WorkerMessage::UnicodeRequest {
+                image: std::sync::Arc::new(img),
+                width: config_clone.unicode.default_width,
+                mode: glyphgen::render_engines::unicode::UnicodeMode::HalfBlocks,
+                color_mode: glyphgen::terminal_capabilities::ColorSupport::TrueColor,
+            };
+            let _ = workers.request_tx.send(msg);
+        }
+        glyphgen::state::RenderMode::TextStylizer => {
+            let msg = WorkerMessage::TextRequest {
+                text: String::from("Example Text"),
+                style: glyphgen::render_engines::text_stylizer::UnicodeStyle::Bold,
+                gradient: glyphgen::render_engines::text_stylizer::GradientMode::None,
+                start_color: (255, 0, 0),
+                end_color: (0, 0, 255),
+            };
+            let _ = workers.request_tx.send(msg);
+        }
+    }
+
+    // Wait for result
+    use std::time::Duration;
+    if let Ok(response) = workers.response_rx.recv_timeout(Duration::from_secs(10)) {
+        match response {
+            glyphgen::worker::WorkerResponse::AsciiComplete { output, render_time } => {
+                let out_file = "ascii_output.txt";
+                std::fs::write(out_file, output)?;
+                println!("Saved ASCII output to {} ({}ms)", out_file, render_time);
+            }
+            glyphgen::worker::WorkerResponse::UnicodeComplete { output, render_time } => {
+                let out_file = "unicode_output.txt";
+                std::fs::write(out_file, output)?;
+                println!("Saved Unicode output to {} ({}ms)", out_file, render_time);
+            }
+            glyphgen::worker::WorkerResponse::TextComplete { output, render_time } => {
+                let out_file = "styled_text.txt";
+                std::fs::write(out_file, output)?;
+                println!("Saved text output to {} ({}ms)", out_file, render_time);
+            }
+            glyphgen::worker::WorkerResponse::Error(err) => {
+                eprintln!("Render error: {}", err);
+            }
+        }
+    } else {
+        eprintln!("Timed out waiting for render response");
     }
 
     Ok(())
