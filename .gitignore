@@ -1,0 +1,63 @@
+# Git ignore for a Rust/Cargo project
+
+# Cargo build output
+/target/
+
+# Backup files created by rustfmt or tooling
+**/*.rs.bk
+
+# Cargo vendor
+/vendor/
+
+# Build artifacts
+**/*.rlib
+**/*.so
+**/*.dylib
+**/*.dll
+**/*.exe
+
+# Profiling
+*.profraw
+*.profdata
+
+# IDEs and editors
+/.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Editor temporary files
+*~
+*.swp
+*.swo
+*.tmp
+*.log
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Environment files
+.env
+.env.*
+
+# Node / front-end artifacts (if any)
+node_modules/
+dist/
+build/
+
+# Coverage
+coverage/
+*.lcov
+
+# Misc
+*.pem
+
+# Local test outputs
+*.out
+
+# Keep Cargo.lock under version control for apps; remove the next line if you prefer to commit it for libraries
+# Cargo.lock
