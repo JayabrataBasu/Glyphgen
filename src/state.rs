@@ -35,16 +35,17 @@ impl RenderMode {
         }
     }
 
-    const ALL_MODES_ARRAY: [RenderMode; 3] = [
-        RenderMode::ImageToAscii,
-        RenderMode::ImageToUnicode,
-        RenderMode::TextStylizer,
-    ];
-
     pub fn all() -> &'static [RenderMode] {
-        &Self::ALL_MODES_ARRAY
+        &ALL_RENDER_MODES[..]
     }
 }
+
+// Module-level static array used by `RenderMode::all()` to ensure a &'static slice
+static ALL_RENDER_MODES: [RenderMode; 3] = [
+    RenderMode::ImageToAscii,
+    RenderMode::ImageToUnicode,
+    RenderMode::TextStylizer,
+];
 
 /// Which widget is currently focused
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

@@ -25,7 +25,7 @@ static SUPPORTED_EXTENSIONS_ARRAY: [&'static str; 8] = ["png", "jpg", "jpeg", "g
 
 /// Get supported image format extensions
 pub fn supported_extensions() -> &'static [&'static str] {
-    &SUPPORTED_EXTENSIONS_ARRAY
+    &SUPPORTED_EXTENSIONS_ARRAY[..]
 }
 
 /// Check if a file extension is a supported image format
