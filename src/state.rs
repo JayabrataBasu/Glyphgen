@@ -366,31 +366,36 @@ impl AppState {
 
         match self.current_mode {
             RenderMode::ImageToAscii | RenderMode::ImageToUnicode => {
-                if let Some(ref image) = self.input_image {
-                    self.is_rendering = true;
-                    self.set_status("Rendering...", false);
+                // Clone the Arc first to avoid borrow conflicts
+                let image = match self.input_image.as_ref() {
+                    Some(img) => Arc::clone(img),
+                    None => {
+                        self.set_status("No image loaded - Press [L] to load", false);
+                        return;
+                    }
+                };
 
-                    let msg = match self.current_mode {
-                        RenderMode::ImageToAscii => WorkerMessage::AsciiRequest {
-                            image: Arc::clone(image),
-                            width: self.ascii_state.width,
-                            charset: self.ascii_state.charset.clone(),
-                            invert: self.ascii_state.invert,
-                            edge_enhance: self.ascii_state.edge_enhance,
-                        },
-                        RenderMode::ImageToUnicode => WorkerMessage::UnicodeRequest {
-                            image: Arc::clone(image),
-                            width: self.unicode_state.width,
-                            mode: self.unicode_state.mode,
-                            color_mode: self.unicode_state.color_mode,
-                        },
-                        _ => return,
-                    };
+                self.is_rendering = true;
+                self.set_status("Rendering...", false);
 
-                    let _ = self.worker_tx.send(msg);
-                } else {
-                    self.set_status("No image loaded - Press [L] to load", false);
-                }
+                let msg = match self.current_mode {
+                    RenderMode::ImageToAscii => WorkerMessage::AsciiRequest {
+                        image,
+                        width: self.ascii_state.width,
+                        charset: self.ascii_state.charset.clone(),
+                        invert: self.ascii_state.invert,
+                        edge_enhance: self.ascii_state.edge_enhance,
+                    },
+                    RenderMode::ImageToUnicode => WorkerMessage::UnicodeRequest {
+                        image,
+                        width: self.unicode_state.width,
+                        mode: self.unicode_state.mode,
+                        color_mode: self.unicode_state.color_mode,
+                    },
+                    _ => return,
+                };
+
+                let _ = self.worker_tx.send(msg);
             }
             RenderMode::TextStylizer => {
                 if self.text_state.input_text.is_empty() {

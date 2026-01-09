@@ -6,8 +6,6 @@ use anyhow::Result;
 use image::{DynamicImage, GenericImageView, GrayImage, Luma};
 use serde::{Deserialize, Serialize};
 
-use crate::color_space::rgb_to_luminance;
-
 /// Character set for ASCII rendering
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CharacterSet {
