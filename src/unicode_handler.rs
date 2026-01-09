@@ -77,12 +77,16 @@ pub fn is_combining(c: char) -> bool {
 
 /// Check if terminal likely supports full Unicode
 pub fn check_unicode_support() -> bool {
-    std::env::var("LANG")
-        .or_else(|_| std::env::var("LC_ALL"))
-        .or_else(|_| std::env::var("LC_CTYPE"))
-        .map(|v| v.to_uppercase().contains("UTF"))
-        .unwrap_or(false)
+    for key in &["LANG", "LC_ALL", "LC_CTYPE"] {
+        if let Ok(v) = std::env::var(key) {
+            if v.to_uppercase().contains("UTF") {
+                return true;
+            }
+        }
+    }
+    false
 }
+
 
 #[cfg(test)]
 mod tests {

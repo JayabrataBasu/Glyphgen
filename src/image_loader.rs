@@ -20,9 +20,12 @@ pub fn load_image_from_bytes(bytes: &[u8]) -> Result<DynamicImage> {
     Ok(img)
 }
 
+/// Supported image format extensions
+static SUPPORTED_EXTENSIONS_ARRAY: [&'static str; 8] = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "tif"];
+
 /// Get supported image format extensions
 pub fn supported_extensions() -> &'static [&'static str] {
-    &["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "tif"]
+    &SUPPORTED_EXTENSIONS_ARRAY
 }
 
 /// Check if a file extension is a supported image format
@@ -71,8 +74,8 @@ mod tests {
     fn test_load_from_bytes() {
         // Test with a simple test - just verify the function exists and handles errors
         // Invalid data should return an error
-        let invalid_data = [0u8; 10];
-        let result = load_image_from_bytes(&invalid_data);
+        let invalid_data: &[u8] = &[0u8; 10][..];
+        let result = load_image_from_bytes(invalid_data);
         assert!(result.is_err());
     }
 }

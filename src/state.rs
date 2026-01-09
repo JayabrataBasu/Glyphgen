@@ -35,12 +35,14 @@ impl RenderMode {
         }
     }
 
+    const ALL_MODES_ARRAY: [RenderMode; 3] = [
+        RenderMode::ImageToAscii,
+        RenderMode::ImageToUnicode,
+        RenderMode::TextStylizer,
+    ];
+
     pub fn all() -> &'static [RenderMode] {
-        &[
-            RenderMode::ImageToAscii,
-            RenderMode::ImageToUnicode,
-            RenderMode::TextStylizer,
-        ]
+        &Self::ALL_MODES_ARRAY
     }
 }
 
@@ -367,12 +369,11 @@ impl AppState {
         match self.current_mode {
             RenderMode::ImageToAscii | RenderMode::ImageToUnicode => {
                 // Clone the Arc first to avoid borrow conflicts
-                let image = match self.input_image.as_ref() {
-                    Some(img) => Arc::clone(img),
-                    None => {
-                        self.set_status("No image loaded - Press [L] to load", false);
-                        return;
-                    }
+                let image = if let Some(img) = self.input_image.as_ref() {
+                    Arc::clone(img)
+                } else {
+                    self.set_status("No image loaded - Press [L] to load", false);
+                    return;
                 };
 
                 self.is_rendering = true;

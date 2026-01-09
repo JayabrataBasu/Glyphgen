@@ -62,23 +62,25 @@ impl UnicodeStyle {
         }
     }
 
+    const ALL_STYLES_ARRAY: [UnicodeStyle; 14] = [
+        UnicodeStyle::Bold,
+        UnicodeStyle::Italic,
+        UnicodeStyle::BoldItalic,
+        UnicodeStyle::Script,
+        UnicodeStyle::BoldScript,
+        UnicodeStyle::Fraktur,
+        UnicodeStyle::DoubleStruck,
+        UnicodeStyle::SansSerif,
+        UnicodeStyle::SansSerifBold,
+        UnicodeStyle::Monospace,
+        UnicodeStyle::Fullwidth,
+        UnicodeStyle::Circled,
+        UnicodeStyle::NegativeCircled,
+        UnicodeStyle::Squared,
+    ];
+
     pub fn all() -> &'static [UnicodeStyle] {
-        &[
-            UnicodeStyle::Bold,
-            UnicodeStyle::Italic,
-            UnicodeStyle::BoldItalic,
-            UnicodeStyle::Script,
-            UnicodeStyle::BoldScript,
-            UnicodeStyle::Fraktur,
-            UnicodeStyle::DoubleStruck,
-            UnicodeStyle::SansSerif,
-            UnicodeStyle::SansSerifBold,
-            UnicodeStyle::Monospace,
-            UnicodeStyle::Fullwidth,
-            UnicodeStyle::Circled,
-            UnicodeStyle::NegativeCircled,
-            UnicodeStyle::Squared,
-        ]
+        &Self::ALL_STYLES_ARRAY
     }
 
     pub fn next(&self) -> Self {

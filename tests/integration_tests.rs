@@ -357,7 +357,8 @@ mod color_space_tests {
         // Gray
         let gray = Rgb::new(128, 128, 128);
         let gray_code = quantize_to_ansi256(gray);
-        assert!(gray_code >= 232 && gray_code <= 255);
+        // u8 max is 255, so no upper bound check needed
+        assert!(gray_code >= 232);
     }
 
     #[test]

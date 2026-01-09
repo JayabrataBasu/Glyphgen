@@ -220,8 +220,8 @@ mod tests {
     fn test_ansi256_grayscale() {
         let gray = Rgb::new(128, 128, 128);
         let code = quantize_to_ansi256(gray);
-        // Should be in grayscale range 232-255
-        assert!(code >= 232 && code <= 255);
+        // Should be in grayscale range 232-255 (u8 max is 255, so no upper bound needed)
+        assert!(code >= 232);
     }
 
     #[test]
