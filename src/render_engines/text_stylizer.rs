@@ -80,7 +80,7 @@ impl UnicodeStyle {
     ];
 
     pub fn all() -> &'static [UnicodeStyle] {
-        &ALL_UNICODE_STYLES[..]
+        &Self::ALL_STYLES_ARRAY[..]
     }
 
     pub fn next(&self) -> Self {
@@ -150,23 +150,7 @@ impl UnicodeStyle {
     }
 }
 
-// Module-level array for all Unicode styles
-static ALL_UNICODE_STYLES: [UnicodeStyle; 14] = [
-    UnicodeStyle::Bold,
-    UnicodeStyle::Italic,
-    UnicodeStyle::BoldItalic,
-    UnicodeStyle::Script,
-    UnicodeStyle::BoldScript,
-    UnicodeStyle::Fraktur,
-    UnicodeStyle::DoubleStruck,
-    UnicodeStyle::SansSerif,
-    UnicodeStyle::SansSerifBold,
-    UnicodeStyle::Monospace,
-    UnicodeStyle::Fullwidth,
-    UnicodeStyle::Circled,
-    UnicodeStyle::NegativeCircled,
-    UnicodeStyle::Squared,
-];
+
 
 /// Gradient coloring mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

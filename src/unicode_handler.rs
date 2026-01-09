@@ -75,16 +75,20 @@ pub fn is_combining(c: char) -> bool {
     )
 }
 
-/// Check if terminal likely supports full Unicode
+/// Internal implementation: detect whether any relevant env var mentions UTF
+#[inline]
+fn terminal_supports_unicode() -> bool {
+    ["LANG", "LC_ALL", "LC_CTYPE"].iter().any(|key| {
+        std::env::var(key)
+            .map(|v| v.to_uppercase().contains("UTF"))
+            .unwrap_or(false)
+    })
+}
+
+/// Public API kept for compatibility; thin wrapper around the internal implementation
+#[must_use]
 pub fn check_unicode_support() -> bool {
-    for key in &["LANG", "LC_ALL", "LC_CTYPE"] {
-        if let Ok(v) = std::env::var(key) {
-            if v.to_uppercase().contains("UTF") {
-                return true;
-            }
-        }
-    }
-    false
+    terminal_supports_unicode()
 }
 
 
@@ -134,5 +138,13 @@ mod tests {
         assert_eq!(grapheme_count("Hello"), 5);
         assert_eq!(grapheme_count("你好"), 2);
         assert_eq!(grapheme_count("👨‍👩‍👧‍👦"), 1); // Family is one grapheme
+    }
+
+    #[test]
+    fn test_check_unicode_support_env() {
+        // Ensure wrapper compiles and returns a bool; set an env var to simulate a UTF locale
+        std::env::set_var("LC_CTYPE", "en_US.UTF-8");
+        assert!(check_unicode_support());
+        std::env::remove_var("LC_CTYPE");
     }
 }
