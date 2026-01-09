@@ -1,0 +1,4 @@
+error: failed to parse manifest at `/home/jayabratabasu/Glyphgen/Cargo.toml`
+
+Caused by:
+  can't find `rendering` bench at `benches/rendering.rs` or `benches/rendering/main.rs`. Please specify bench.path if you want to use a non-default path.

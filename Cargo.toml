@@ -1,0 +1,61 @@
+[package]
+name = "glyphgen"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.75.0"
+description = "High-Performance Terminal Art Rendering Studio"
+authors = ["Jayabrata Basu"]
+license = "MIT"
+repository = "https://github.com/JayabrataBasu/Glyphgen"
+keywords = ["ascii-art", "unicode", "terminal", "tui", "image-processing"]
+categories = ["command-line-interface", "graphics", "multimedia::images"]
+
+[dependencies]
+# TUI Framework
+ratatui = "0.28"
+crossterm = "0.27"
+
+# Image Processing
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+
+# Color Handling
+palette = "0.7"
+
+# Unicode Support
+unicode-width = "0.1"
+unicode-segmentation = "1.10"
+
+# Concurrency
+tokio = { version = "1.35", features = ["rt-multi-thread", "fs", "io-util", "sync", "macros"] }
+crossbeam-channel = "0.5"
+
+# Configuration
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+directories = "5.0"
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Clipboard support
+arboard = "3.4"
+
+[dev-dependencies]
+# Testing
+criterion = "0.5"
+proptest = "1.4"
+insta = "1.34"
+
+[[bench]]
+name = "rendering"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 1
