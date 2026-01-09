@@ -1,2 +1,2 @@
-# Charcuterie
+# Glyphgen
 An Ascii generator
