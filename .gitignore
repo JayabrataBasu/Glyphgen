@@ -64,3 +64,6 @@ coverage/
 
 # Project-specific ignored files
 /Plan.md
+
+# Generated unicode output files
+/unicode_output.*
