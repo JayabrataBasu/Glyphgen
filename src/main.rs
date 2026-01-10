@@ -42,6 +42,7 @@ fn main() -> Result<()> {
     let mut arg_image: Option<std::path::PathBuf> = None;
     let mut arg_render_once = false;
     let mut arg_mode: Option<String> = None;
+    let mut arg_output_format: Option<String> = None;
 
     let mut iter = std::env::args().skip(1);
     while let Some(a) = iter.next() {
@@ -55,6 +56,11 @@ fn main() -> Result<()> {
             "--mode" => {
                 if let Some(m) = iter.next() {
                     arg_mode = Some(m);
+                }
+            }
+            "--output-format" => {
+                if let Some(f) = iter.next() {
+                    arg_output_format = Some(f);
                 }
             }
             _ => {}
@@ -72,7 +78,13 @@ fn main() -> Result<()> {
 
     // If render-once was requested, do not start full TUI — perform a single render + save
     if arg_render_once && arg_image.is_some() {
-        return run_render_once(arg_image.unwrap(), arg_mode.as_deref(), &config, &workers);
+        return run_render_once(
+            arg_image.unwrap(),
+            arg_mode.as_deref(),
+            arg_output_format.as_deref(),
+            &config,
+            &workers,
+        );
     }
 
     // Create application state
@@ -178,6 +190,7 @@ fn run_event_loop(
 fn run_render_once(
     image_path: std::path::PathBuf,
     mode: Option<&str>,
+    output_format: Option<&str>,
     config: &Config,
     workers: &WorkerHandle,
 ) -> Result<()> {
@@ -240,9 +253,19 @@ fn run_render_once(
                 println!("Saved ASCII output to {} ({}ms)", out_file, render_time);
             }
             glyphgen::worker::WorkerResponse::UnicodeComplete { output, render_time } => {
-                let out_file = "unicode_output.txt";
-                std::fs::write(out_file, output)?;
-                println!("Saved Unicode output to {} ({}ms)", out_file, render_time);
+                match output_format {
+                    Some("html") => {
+                        let out_file = "unicode_output.html";
+                        let html = glyphgen::input::convert_ansi_to_html(&output);
+                        std::fs::write(out_file, html)?;
+                        println!("Saved Unicode output to {} ({}ms)", out_file, render_time);
+                    }
+                    _ => {
+                        let out_file = "unicode_output.ansi";
+                        std::fs::write(out_file, output)?;
+                        println!("Saved Unicode output to {} ({}ms)", out_file, render_time);
+                    }
+                }
             }
             glyphgen::worker::WorkerResponse::TextComplete { output, render_time } => {
                 let out_file = "styled_text.txt";

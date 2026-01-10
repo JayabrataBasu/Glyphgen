@@ -405,7 +405,8 @@ fn save_output(state: &mut AppState) -> Result<()> {
 }
 
 /// Convert ANSI-rendered content to a simple HTML document with inline styles
-fn convert_ansi_to_html(content: &str) -> String {
+/// Convert ANSI-rendered content to a simple HTML document with inline styles
+pub fn convert_ansi_to_html(content: &str) -> String {
     fn css_color(c: &Option<ratatui::style::Color>) -> Option<String> {
         match c {
             Some(ratatui::style::Color::Rgb(r, g, b)) => Some(format!("rgb({},{},{})", r, g, b)),
