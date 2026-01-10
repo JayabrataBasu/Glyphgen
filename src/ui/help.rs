@@ -117,8 +117,12 @@ fn create_help_text() -> Vec<Line<'static>> {
         Line::from(""),
         Line::from(Span::styled("Preview Area", section_style)),
         Line::from(vec![
-            Span::styled("  ↑ ↓         ", key_style),
-            Span::styled("Scroll by line", desc_style),
+            Span::styled("  ↑ ↓ j k     ", key_style),
+            Span::styled("Scroll vertically", desc_style),
+        ]),
+        Line::from(vec![
+            Span::styled("  ← → h l     ", key_style),
+            Span::styled("Scroll horizontally (pan)", desc_style),
         ]),
         Line::from(vec![
             Span::styled("  PgUp PgDn   ", key_style),
@@ -131,6 +135,12 @@ fn create_help_text() -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled("  C           ", key_style),
             Span::styled("Copy to clipboard", desc_style),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled("Zoom Tips", section_style)),
+        Line::from(vec![
+            Span::styled("  Width +/-   ", key_style),
+            Span::styled("Adjust in Control Panel, re-render", desc_style),
         ]),
         Line::from(""),
         Line::from(Span::styled(

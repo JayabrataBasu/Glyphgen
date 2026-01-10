@@ -254,6 +254,7 @@ pub struct AppState {
     pub input_image: Option<Arc<DynamicImage>>,
     pub preview_content: Option<String>,
     pub preview_scroll: usize,
+    pub preview_scroll_x: usize,  // Horizontal scroll position
     pub status_message: String,
     pub status_is_error: bool,
 
@@ -315,6 +316,7 @@ impl AppState {
             input_image: None,
             preview_content: None,
             preview_scroll: 0,
+            preview_scroll_x: 0,
             status_message: "Ready - Press [?] for help".to_string(),
             status_is_error: false,
 
@@ -444,19 +446,19 @@ impl AppState {
         match response {
             WorkerResponse::AsciiComplete { output, render_time } => {
                 self.preview_content = Some(output);
-                self.preview_scroll = 0;
+                self.reset_scroll();
                 self.perf_metrics.last_render_time_ms = render_time;
                 self.set_status(&format!("Rendered in {}ms", render_time), false);
             }
             WorkerResponse::UnicodeComplete { output, render_time } => {
                 self.preview_content = Some(output);
-                self.preview_scroll = 0;
+                self.reset_scroll();
                 self.perf_metrics.last_render_time_ms = render_time;
                 self.set_status(&format!("Rendered in {}ms", render_time), false);
             }
             WorkerResponse::TextComplete { output, render_time } => {
                 self.preview_content = Some(output);
-                self.preview_scroll = 0;
+                self.reset_scroll();
                 self.perf_metrics.last_render_time_ms = render_time;
                 self.set_status(&format!("Stylized in {}ms", render_time), false);
             }
@@ -589,5 +591,29 @@ impl AppState {
             let line_count = content.lines().count();
             self.preview_scroll = (self.preview_scroll + amount).min(line_count.saturating_sub(1));
         }
+    }
+
+    /// Scroll preview left (horizontal)
+    pub fn scroll_left(&mut self, amount: usize) {
+        self.preview_scroll_x = self.preview_scroll_x.saturating_sub(amount);
+    }
+
+    /// Scroll preview right (horizontal)
+    pub fn scroll_right(&mut self, amount: usize) {
+        if let Some(ref content) = self.preview_content {
+            // Find the maximum line width
+            let max_width = content
+                .lines()
+                .map(|line| crate::input::strip_ansi_codes(line).chars().count())
+                .max()
+                .unwrap_or(0);
+            self.preview_scroll_x = (self.preview_scroll_x + amount).min(max_width.saturating_sub(1));
+        }
+    }
+
+    /// Reset horizontal scroll when content changes
+    pub fn reset_scroll(&mut self) {
+        self.preview_scroll = 0;
+        self.preview_scroll_x = 0;
     }
 }

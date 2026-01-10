@@ -4,9 +4,7 @@
 
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use std::path::PathBuf;
 
-use crate::image_loader::load_image;
 use crate::state::{AppState, FocusedWidget, RenderMode};
 
 /// Handle an input event
@@ -222,12 +220,15 @@ fn handle_control_panel_input(key: KeyEvent, state: &mut AppState) -> Result<()>
 /// Handle input for preview widget
 fn handle_preview_input(key: KeyEvent, state: &mut AppState) -> Result<()> {
     match key.code {
-        // Scrolling
+        // Vertical scrolling
         KeyCode::Up | KeyCode::Char('k') => state.scroll_up(1),
         KeyCode::Down | KeyCode::Char('j') => state.scroll_down(1),
         KeyCode::PageUp => state.scroll_up(10),
         KeyCode::PageDown => state.scroll_down(10),
-        KeyCode::Home => state.preview_scroll = 0,
+        KeyCode::Home => {
+            state.preview_scroll = 0;
+            state.preview_scroll_x = 0;
+        }
         KeyCode::End => {
             if let Some(ref content) = state.preview_content {
                 let line_count = content.lines().count();
@@ -235,10 +236,14 @@ fn handle_preview_input(key: KeyEvent, state: &mut AppState) -> Result<()> {
             }
         }
 
+        // Horizontal scrolling
+        KeyCode::Left | KeyCode::Char('h') => state.scroll_left(5),
+        KeyCode::Right | KeyCode::Char('l') => state.scroll_right(5),
+
         // Actions
         KeyCode::Char('s') | KeyCode::Char('S') => save_output(state)?,
         KeyCode::Char('c') | KeyCode::Char('C') => copy_to_clipboard(state)?,
-        KeyCode::Char('l') | KeyCode::Char('L') => {
+        KeyCode::Char('L') => {
             state.start_load_prompt();
         }
         KeyCode::Char(' ') => state.trigger_render(),
@@ -348,55 +353,6 @@ fn toggle_current_setting(state: &mut AppState) -> bool {
     }
 }
 
-/// Open file dialog to load an image
-fn load_image_dialog(state: &mut AppState) -> Result<()> {
-    // Simple approach: use environment variable or hardcoded test path
-    // In a real app, you'd integrate with a file picker or use stdin
-    
-    // Try to get path from environment or use a dialog
-    if let Ok(path) = std::env::var("GLYPHGEN_IMAGE") {
-        let path = PathBuf::from(path);
-        match load_image(&path) {
-            Ok(img) => {
-                state.set_input_image(path, img);
-            }
-            Err(e) => {
-                state.set_status(&format!("Failed to load: {}", e), true);
-            }
-        }
-        return Ok(());
-    }
-
-    // Prompt user for path
-    state.set_status("Enter image path in GLYPHGEN_IMAGE env var", false);
-    
-    // Alternative: Try common test images
-    let test_paths = [
-        "test.png",
-        "test.jpg",
-        "image.png",
-        "image.jpg",
-        "input.png",
-        "input.jpg",
-    ];
-    
-    for path_str in test_paths {
-        let path = PathBuf::from(path_str);
-        if path.exists() {
-            match load_image(&path) {
-                Ok(img) => {
-                    state.set_input_image(path, img);
-                    return Ok(());
-                }
-                Err(_) => continue,
-            }
-        }
-    }
-    
-    state.set_status("No image found. Set GLYPHGEN_IMAGE=path/to/image", false);
-    Ok(())
-}
-
 /// Save output to file
 fn save_output(state: &mut AppState) -> Result<()> {
     if let Some(ref content) = state.preview_content {
@@ -445,6 +401,141 @@ fn copy_to_clipboard(state: &mut AppState) -> Result<()> {
         state.set_status("Nothing to copy - render first", false);
     }
     Ok(())
+}
+
+/// Parse ANSI color codes into Ratatui Span components
+/// Returns a Vec of (text, Option<fg_color>, Option<bg_color>)
+pub(crate) fn parse_ansi_to_spans(text: &str) -> Vec<(String, Option<ratatui::style::Color>, Option<ratatui::style::Color>)> {
+    let mut result = Vec::new();
+    let mut current_text = String::new();
+    let mut current_fg: Option<ratatui::style::Color> = None;
+    let mut current_bg: Option<ratatui::style::Color> = None;
+    let mut chars = text.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Push any accumulated text
+            if !current_text.is_empty() {
+                result.push((std::mem::take(&mut current_text), current_fg, current_bg));
+            }
+
+            // Parse escape sequence
+            if chars.peek() == Some(&'[') {
+                chars.next(); // consume '['
+                let mut params = String::new();
+                
+                // Collect parameter bytes
+                while let Some(&next) = chars.peek() {
+                    if next.is_ascii_alphabetic() {
+                        chars.next();
+                        if next == 'm' {
+                            // SGR sequence - parse color codes
+                            parse_sgr_params(&params, &mut current_fg, &mut current_bg);
+                        }
+                        break;
+                    }
+                    params.push(chars.next().unwrap());
+                }
+            } else {
+                // Skip other escape sequences
+                while let Some(&next) = chars.peek() {
+                    chars.next();
+                    if next == '\x07' || next.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            current_text.push(c);
+        }
+    }
+
+    // Push remaining text
+    if !current_text.is_empty() {
+        result.push((current_text, current_fg, current_bg));
+    }
+
+    result
+}
+
+/// Parse SGR (Select Graphic Rendition) parameters
+fn parse_sgr_params(params: &str, fg: &mut Option<ratatui::style::Color>, bg: &mut Option<ratatui::style::Color>) {
+    let parts: Vec<&str> = params.split(';').collect();
+    let mut i = 0;
+
+    while i < parts.len() {
+        match parts[i] {
+            "0" => {
+                // Reset
+                *fg = None;
+                *bg = None;
+            }
+            "38" => {
+                // Foreground color
+                if i + 1 < parts.len() {
+                    if parts[i + 1] == "2" && i + 4 < parts.len() {
+                        // True color: 38;2;R;G;B
+                        if let (Ok(r), Ok(g), Ok(b)) = (
+                            parts[i + 2].parse::<u8>(),
+                            parts[i + 3].parse::<u8>(),
+                            parts[i + 4].parse::<u8>(),
+                        ) {
+                            *fg = Some(ratatui::style::Color::Rgb(r, g, b));
+                        }
+                        i += 4;
+                    } else if parts[i + 1] == "5" && i + 2 < parts.len() {
+                        // 256 color: 38;5;N
+                        if let Ok(n) = parts[i + 2].parse::<u8>() {
+                            *fg = Some(ratatui::style::Color::Indexed(n));
+                        }
+                        i += 2;
+                    }
+                }
+            }
+            "48" => {
+                // Background color
+                if i + 1 < parts.len() {
+                    if parts[i + 1] == "2" && i + 4 < parts.len() {
+                        // True color: 48;2;R;G;B
+                        if let (Ok(r), Ok(g), Ok(b)) = (
+                            parts[i + 2].parse::<u8>(),
+                            parts[i + 3].parse::<u8>(),
+                            parts[i + 4].parse::<u8>(),
+                        ) {
+                            *bg = Some(ratatui::style::Color::Rgb(r, g, b));
+                        }
+                        i += 4;
+                    } else if parts[i + 1] == "5" && i + 2 < parts.len() {
+                        // 256 color: 48;5;N
+                        if let Ok(n) = parts[i + 2].parse::<u8>() {
+                            *bg = Some(ratatui::style::Color::Indexed(n));
+                        }
+                        i += 2;
+                    }
+                }
+            }
+            // Basic foreground colors (30-37)
+            "30" => *fg = Some(ratatui::style::Color::Black),
+            "31" => *fg = Some(ratatui::style::Color::Red),
+            "32" => *fg = Some(ratatui::style::Color::Green),
+            "33" => *fg = Some(ratatui::style::Color::Yellow),
+            "34" => *fg = Some(ratatui::style::Color::Blue),
+            "35" => *fg = Some(ratatui::style::Color::Magenta),
+            "36" => *fg = Some(ratatui::style::Color::Cyan),
+            "37" => *fg = Some(ratatui::style::Color::White),
+            // Basic background colors (40-47)
+            "40" => *bg = Some(ratatui::style::Color::Black),
+            "41" => *bg = Some(ratatui::style::Color::Red),
+            "42" => *bg = Some(ratatui::style::Color::Green),
+            "43" => *bg = Some(ratatui::style::Color::Yellow),
+            "44" => *bg = Some(ratatui::style::Color::Blue),
+            "45" => *bg = Some(ratatui::style::Color::Magenta),
+            "46" => *bg = Some(ratatui::style::Color::Cyan),
+            "47" => *bg = Some(ratatui::style::Color::White),
+            _ => {}
+        }
+        i += 1;
+    }
 }
 
 /// Strip ANSI escape codes from text
