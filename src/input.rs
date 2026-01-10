@@ -275,16 +275,28 @@ fn adjust_setting_left(state: &mut AppState) {
     match state.current_mode {
         RenderMode::ImageToAscii => match state.ascii_state.selected_setting {
             1 => state.ascii_state.charset = state.ascii_state.charset.prev(),
+            4 => state.preview_output_format = match state.preview_output_format {
+                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
+                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
+            },
             _ => {}
         },
         RenderMode::ImageToUnicode => match state.unicode_state.selected_setting {
             1 => state.unicode_state.mode = state.unicode_state.mode.prev(),
             2 => state.unicode_state.color_mode = state.unicode_state.color_mode.prev(),
+            3 => state.preview_output_format = match state.preview_output_format {
+                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
+                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
+            },
             _ => {}
         },
         RenderMode::TextStylizer => match state.text_state.selected_setting {
             0 => state.text_state.style = state.text_state.style.prev(),
             1 => state.text_state.gradient = state.text_state.gradient.prev(),
+            5 => state.preview_output_format = match state.preview_output_format {
+                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
+                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
+            },
             _ => {}
         },
     }
@@ -295,16 +307,28 @@ fn adjust_setting_right(state: &mut AppState) {
     match state.current_mode {
         RenderMode::ImageToAscii => match state.ascii_state.selected_setting {
             1 => state.ascii_state.charset = state.ascii_state.charset.next(),
+            4 => state.preview_output_format = match state.preview_output_format {
+                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
+                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
+            },
             _ => {}
         },
         RenderMode::ImageToUnicode => match state.unicode_state.selected_setting {
             1 => state.unicode_state.mode = state.unicode_state.mode.next(),
             2 => state.unicode_state.color_mode = state.unicode_state.color_mode.next(),
+            3 => state.preview_output_format = match state.preview_output_format {
+                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
+                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
+            },
             _ => {}
         },
         RenderMode::TextStylizer => match state.text_state.selected_setting {
             0 => state.text_state.style = state.text_state.style.next(),
             1 => state.text_state.gradient = state.text_state.gradient.next(),
+            5 => state.preview_output_format = match state.preview_output_format {
+                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
+                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
+            },
             _ => {}
         },
     }

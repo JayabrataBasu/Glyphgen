@@ -57,6 +57,14 @@ pub fn render_ascii_controls(frame: &mut Frame, area: Rect, state: &AppState, is
     lines.push(create_action_line("[L]", "Load Image"));
     lines.push(create_action_line("[S]", "Save Output"));
 
+    // Output format
+    lines.push(create_setting_line(
+        "Output Format",
+        state.preview_output_format.name(),
+        selected == 4 && is_focused,
+        Some("[←/→]"),
+    ));
+
     // Tip shown when this panel is focused
     if is_focused {
         lines.push(Line::from(Span::styled(
@@ -103,6 +111,14 @@ pub fn render_unicode_controls(frame: &mut Frame, area: Rect, state: &AppState, 
     lines.push(create_action_line("[Space]", "Render"));
     lines.push(create_action_line("[L]", "Load Image"));
     lines.push(create_action_line("[S]", "Save Output"));
+
+    // Output format
+    lines.push(create_setting_line(
+        "Output Format",
+        state.preview_output_format.name(),
+        selected == 3 && is_focused,
+        Some("[←/→]"),
+    ));
 
     // Tip shown when this panel is focused
     if is_focused {
@@ -208,6 +224,14 @@ pub fn render_text_controls(frame: &mut Frame, area: Rect, state: &AppState, is_
     lines.push(Line::from(""));
     lines.push(create_action_line("[Space]", "Stylize"));
     lines.push(create_action_line("[S]", "Save Output"));
+
+    // Output format
+    lines.push(create_setting_line(
+        "Output Format",
+        state.preview_output_format.name(),
+        selected == 5 && is_focused,
+        Some("[←/→]"),
+    ));
 
     // Tip shown when this panel is focused
     if is_focused {

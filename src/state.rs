@@ -98,7 +98,7 @@ impl Default for AsciiRenderState {
 
 impl AsciiRenderState {
     pub fn settings_count() -> usize {
-        4 // width, charset, invert, edge_enhance
+        5 // width, charset, invert, edge_enhance, output_format
     }
 
     pub fn setting_name(&self, index: usize) -> &'static str {
@@ -144,7 +144,7 @@ impl Default for UnicodeRenderState {
 
 impl UnicodeRenderState {
     pub fn settings_count() -> usize {
-        3 // width, mode, color
+        4 // width, mode, color, output_format
     }
 
     pub fn setting_name(&self, index: usize) -> &'static str {
@@ -196,7 +196,7 @@ impl Default for TextStylizeState {
 
 impl TextStylizeState {
     pub fn settings_count() -> usize {
-        5 // style, gradient, start_color, end_color, input
+        6 // style, gradient, start_color, end_color, input, output_format
     }
 
     pub fn setting_name(&self, index: usize) -> &'static str {
@@ -291,6 +291,15 @@ pub enum OutputFormat {
 impl Default for OutputFormat {
     fn default() -> Self {
         OutputFormat::Ansi
+    }
+}
+
+impl OutputFormat {
+    pub fn name(&self) -> &'static str {
+        match self {
+            OutputFormat::Ansi => "ANSI",
+            OutputFormat::Html => "HTML",
+        }
     }
 }
 
