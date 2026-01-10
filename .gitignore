@@ -61,3 +61,6 @@ coverage/
 
 # Keep Cargo.lock under version control for apps; remove the next line if you prefer to commit it for libraries
 # Cargo.lock
+
+# Project-specific ignored files
+/Plan.md
