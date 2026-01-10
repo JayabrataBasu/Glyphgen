@@ -249,9 +249,12 @@ fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|n| format!(" │ {}", n.to_string_lossy()))
         .unwrap_or_default();
 
+    // Output format display
+    let format_info = format!(" │ {}", state.preview_output_format.name());
+
     // Calculate spacing
     let status_len = state.status_message.len();
-    let info_len = perf_info.len() + file_info.len();
+    let info_len = perf_info.len() + file_info.len() + format_info.len();
     let spacing = (area.width as usize)
         .saturating_sub(status_len)
         .saturating_sub(info_len)
@@ -263,6 +266,7 @@ fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
         Span::raw(" ".repeat(spacing)),
         Span::styled(&perf_info, Style::default().fg(Color::DarkGray)),
         Span::styled(&file_info, Style::default().fg(Color::Blue)),
+        Span::styled(&format_info, Style::default().fg(Color::Magenta)),
         Span::raw(" "),
     ]);
 
