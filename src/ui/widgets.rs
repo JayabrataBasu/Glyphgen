@@ -57,6 +57,14 @@ pub fn render_ascii_controls(frame: &mut Frame, area: Rect, state: &AppState, is
     lines.push(create_action_line("[L]", "Load Image"));
     lines.push(create_action_line("[S]", "Save Output"));
 
+    // Tip shown when this panel is focused
+    if is_focused {
+        lines.push(Line::from(Span::styled(
+            "Tip: Press Tab to switch focus between Mode Selector, Control Panel and Preview",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
     let widget = Paragraph::new(lines);
     frame.render_widget(widget, area);
 }
@@ -95,6 +103,14 @@ pub fn render_unicode_controls(frame: &mut Frame, area: Rect, state: &AppState, 
     lines.push(create_action_line("[Space]", "Render"));
     lines.push(create_action_line("[L]", "Load Image"));
     lines.push(create_action_line("[S]", "Save Output"));
+
+    // Tip shown when this panel is focused
+    if is_focused {
+        lines.push(Line::from(Span::styled(
+            "Tip: Press Tab to switch focus between Mode Selector, Control Panel and Preview",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
 
     let widget = Paragraph::new(lines);
     frame.render_widget(widget, area);
@@ -192,6 +208,14 @@ pub fn render_text_controls(frame: &mut Frame, area: Rect, state: &AppState, is_
     lines.push(Line::from(""));
     lines.push(create_action_line("[Space]", "Stylize"));
     lines.push(create_action_line("[S]", "Save Output"));
+
+    // Tip shown when this panel is focused
+    if is_focused {
+        lines.push(Line::from(Span::styled(
+            "Tip: Press Tab to switch focus between Mode Selector, Control Panel and Preview",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
 
     let widget = Paragraph::new(lines);
     frame.render_widget(widget, area);

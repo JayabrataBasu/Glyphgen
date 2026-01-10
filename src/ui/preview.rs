@@ -44,7 +44,11 @@ fn render_preview_content(frame: &mut Frame, area: Rect, content: &str, scroll: 
         .lines()
         .skip(scroll)
         .take(area.height as usize)
-        .map(|line| Line::raw(line))
+        .map(|line| {
+            // Strip ANSI escape sequences so raw control codes don't appear in the TUI preview
+            let clean = crate::input::strip_ansi_codes(line);
+            Line::raw(clean)
+        })
         .collect();
 
     let total_lines = content.lines().count();

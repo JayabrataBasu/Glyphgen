@@ -103,6 +103,10 @@ fn create_help_text() -> Vec<Line<'static>> {
             Span::styled("Toggle / Render", desc_style),
         ]),
         Line::from(vec![
+            Span::styled("  Enter / E    ", key_style),
+            Span::styled("Edit text (Text Stylizer input)", desc_style),
+        ]),
+        Line::from(vec![
             Span::styled("  L           ", key_style),
             Span::styled("Load image", desc_style),
         ]),

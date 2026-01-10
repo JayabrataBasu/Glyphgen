@@ -193,8 +193,18 @@ fn handle_control_panel_input(key: KeyEvent, state: &mut AppState) -> Result<()>
                 && state.text_state.selected_setting == 4
             {
                 state.text_state.editing_text = true;
+                state.set_status("Editing text: type and press Enter (Esc to cancel)", false);
             } else {
                 state.trigger_render();
+            }
+        }
+        // Also allow quick edit with 'e' when on Input field
+        KeyCode::Char('e') => {
+            if matches!(state.current_mode, RenderMode::TextStylizer)
+                && state.text_state.selected_setting == 4
+            {
+                state.text_state.editing_text = true;
+                state.set_status("Editing text: type and press Enter (Esc to cancel)", false);
             }
         }
 
@@ -438,18 +448,26 @@ fn copy_to_clipboard(state: &mut AppState) -> Result<()> {
 }
 
 /// Strip ANSI escape codes from text
-fn strip_ansi_codes(text: &str) -> String {
+pub(crate) fn strip_ansi_codes(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
 
     while let Some(c) = chars.next() {
         if c == '\x1b' {
-            // Skip escape sequence
+            // Skip CSI-like escape sequences (ESC [ ... letter)
             if chars.peek() == Some(&'[') {
                 chars.next(); // consume '['
                 while let Some(&next) = chars.peek() {
                     chars.next();
                     if next.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            } else {
+                // For other ESC sequences (OSC etc.), attempt to skip until BEL or 'c' or alphabetic terminator
+                while let Some(&next) = chars.peek() {
+                    chars.next();
+                    if next == '\x07' || next.is_ascii_alphabetic() {
                         break;
                     }
                 }
