@@ -44,6 +44,15 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
             state.show_help = true;
             return Ok(());
         }
+        KeyCode::Char('o') | KeyCode::Char('O') => {
+            // Cycle output format
+            state.preview_output_format = match state.preview_output_format {
+                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
+                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
+            };
+            state.set_status(&format!("Output format: {:?}", state.preview_output_format), false);
+            return Ok(());
+        }
         KeyCode::Tab => {
             if key.modifiers.contains(KeyModifiers::SHIFT) {
                 state.focus = state.focus.prev();
@@ -240,6 +249,14 @@ fn handle_preview_input(key: KeyEvent, state: &mut AppState) -> Result<()> {
         KeyCode::Left | KeyCode::Char('h') => state.scroll_left(5),
         KeyCode::Right | KeyCode::Char('l') => state.scroll_right(5),
 
+        // Zoom in/out (adjust render width) - apply to current mode
+        KeyCode::Char('+') | KeyCode::Char('=') => {
+            state.adjust_zoom(true);
+        }
+        KeyCode::Char('-') | KeyCode::Char('_') => {
+            state.adjust_zoom(false);
+        }
+
         // Actions
         KeyCode::Char('s') | KeyCode::Char('S') => save_output(state)?,
         KeyCode::Char('c') | KeyCode::Char('C') => copy_to_clipboard(state)?,
@@ -356,27 +373,123 @@ fn toggle_current_setting(state: &mut AppState) -> bool {
 /// Save output to file
 fn save_output(state: &mut AppState) -> Result<()> {
     if let Some(ref content) = state.preview_content {
-        let filename = match state.current_mode {
-            RenderMode::ImageToAscii => "ascii_output.txt",
-            RenderMode::ImageToUnicode => "unicode_output.txt",
-            RenderMode::TextStylizer => "styled_text.txt",
+        // Determine filename base
+        let base = match state.current_mode {
+            RenderMode::ImageToAscii => "ascii_output",
+            RenderMode::ImageToUnicode => "unicode_output",
+            RenderMode::TextStylizer => "styled_text",
         };
 
-        // Strip ANSI codes for clean text output
-        let clean_content = strip_ansi_codes(content);
-
-        match std::fs::write(filename, &clean_content) {
-            Ok(_) => {
-                state.set_status(&format!("Saved to {}", filename), false);
+        match state.preview_output_format {
+            crate::state::OutputFormat::Ansi => {
+                let filename = format!("{}.ansi", base);
+                // Save raw ANSI content as-is
+                match std::fs::write(&filename, content) {
+                    Ok(_) => state.set_status(&format!("Saved to {}", filename), false),
+                    Err(e) => state.set_status(&format!("Save failed: {}", e), true),
+                }
             }
-            Err(e) => {
-                state.set_status(&format!("Save failed: {}", e), true);
+            crate::state::OutputFormat::Html => {
+                let filename = format!("{}.html", base);
+                let html = convert_ansi_to_html(content);
+                match std::fs::write(&filename, html) {
+                    Ok(_) => state.set_status(&format!("Saved to {}", filename), false),
+                    Err(e) => state.set_status(&format!("Save failed: {}", e), true),
+                }
             }
         }
     } else {
         state.set_status("Nothing to save - render first", false);
     }
     Ok(())
+}
+
+/// Convert ANSI-rendered content to a simple HTML document with inline styles
+fn convert_ansi_to_html(content: &str) -> String {
+    fn css_color(c: &Option<ratatui::style::Color>) -> Option<String> {
+        match c {
+            Some(ratatui::style::Color::Rgb(r, g, b)) => Some(format!("rgb({},{},{})", r, g, b)),
+            Some(ratatui::style::Color::Indexed(n)) => Some(indexed_to_css(*n)),
+            Some(ratatui::style::Color::Black) => Some("black".into()),
+            Some(ratatui::style::Color::Red) => Some("red".into()),
+            Some(ratatui::style::Color::Green) => Some("green".into()),
+            Some(ratatui::style::Color::Yellow) => Some("yellow".into()),
+            Some(ratatui::style::Color::Blue) => Some("blue".into()),
+            Some(ratatui::style::Color::Magenta) => Some("magenta".into()),
+            Some(ratatui::style::Color::Cyan) => Some("cyan".into()),
+            Some(ratatui::style::Color::White) => Some("white".into()),
+            _ => None,
+        }
+    }
+
+    fn escape_html(s: &str) -> String {
+        s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    }
+
+    let mut html = String::new();
+    html.push_str("<!doctype html>\n<html><head><meta charset=\"utf-8\"><style>pre{font-family:monospace;white-space:pre;}</style></head><body><pre>");
+
+    for line in content.lines() {
+        let parts = parse_ansi_to_spans(line);
+        for (text, fg, bg) in parts {
+            let mut styles = Vec::new();
+            if let Some(fg_css) = css_color(&fg) {
+                styles.push(format!("color:{}", fg_css));
+            }
+            if let Some(bg_css) = css_color(&bg) {
+                styles.push(format!("background-color:{}", bg_css));
+            }
+            if styles.is_empty() {
+                html.push_str(&escape_html(&text));
+            } else {
+                html.push_str(&format!("<span style=\"{}\">{}</span>", styles.join(";"), escape_html(&text)));
+            }
+        }
+        html.push('\n');
+    }
+
+    html.push_str("</pre></body></html>");
+    html
+}
+
+/// Convert a 256-index color to CSS rgb using the xterm palette
+fn indexed_to_css(n: u8) -> String {
+    let n = n as i32;
+    if n < 16 {
+        // basic colors - map approximately
+        match n {
+            0 => "#000000".into(),
+            1 => "#800000".into(),
+            2 => "#008000".into(),
+            3 => "#808000".into(),
+            4 => "#000080".into(),
+            5 => "#800080".into(),
+            6 => "#008080".into(),
+            7 => "#c0c0c0".into(),
+            8 => "#808080".into(),
+            9 => "#ff0000".into(),
+            10 => "#00ff00".into(),
+            11 => "#ffff00".into(),
+            12 => "#0000ff".into(),
+            13 => "#ff00ff".into(),
+            14 => "#00ffff".into(),
+            15 => "#ffffff".into(),
+            _ => "#000000".into(),
+        }
+    } else if n >= 16 && n <= 231 {
+        let idx = n - 16;
+        let b = idx % 6;
+        let g = (idx / 6) % 6;
+        let r = (idx / 36) % 6;
+        let r = if r == 0 {0} else {r * 40 + 55};
+        let g = if g == 0 {0} else {g * 40 + 55};
+        let b = if b == 0 {0} else {b * 40 + 55};
+        format!("rgb({},{},{})", r, g, b)
+    } else {
+        // grayscale 232..255
+        let shade = 8 + (n - 232) * 10;
+        format!("rgb({},{},{})", shade, shade, shade)
+    }
 }
 
 /// Copy output to clipboard
@@ -594,5 +707,13 @@ mod tests {
         let input = "\x1b[38;5;196mR\x1b[38;5;208mA\x1b[38;5;226mI\x1b[38;5;46mN\x1b[38;5;21mB\x1b[38;5;129mO\x1b[38;5;196mW\x1b[0m";
         let output = strip_ansi_codes(input);
         assert_eq!(output, "RAINBOW");
+    }
+
+    #[test]
+    fn test_convert_ansi_to_html_basic() {
+        let input = "\x1b[38;2;255;0;0mRed\x1b[0m";
+        let html = convert_ansi_to_html(input);
+        assert!(html.contains("rgb(255,0,0)"));
+        assert!(html.contains("Red"));
     }
 }

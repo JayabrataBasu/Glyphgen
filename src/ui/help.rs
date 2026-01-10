@@ -114,6 +114,10 @@ fn create_help_text() -> Vec<Line<'static>> {
             Span::styled("  S           ", key_style),
             Span::styled("Save output", desc_style),
         ]),
+        Line::from(vec![
+            Span::styled("  O           ", key_style),
+            Span::styled("Cycle output format (ANSI/HTML)", desc_style),
+        ]),
         Line::from(""),
         Line::from(Span::styled("Preview Area", section_style)),
         Line::from(vec![

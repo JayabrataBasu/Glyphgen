@@ -274,8 +274,24 @@ pub struct AppState {
     pub load_prompt_input: String,
     pub load_prompt_error: Option<String>,
 
+    // Preview control
+    pub preview_output_format: OutputFormat,
+
     // Worker communication
     worker_tx: Sender<WorkerMessage>,
+}
+
+/// Output format used when saving previews
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    Ansi,
+    Html,
+}
+
+impl Default for OutputFormat {
+    fn default() -> Self {
+        OutputFormat::Ansi
+    }
 }
 
 impl AppState {
@@ -332,6 +348,9 @@ impl AppState {
             load_prompt_active: false,
             load_prompt_input: String::new(),
             load_prompt_error: None,
+
+            // Default to ANSI output for terminal-first usage
+            preview_output_format: OutputFormat::default(),
 
             worker_tx,
         }
@@ -615,5 +634,56 @@ impl AppState {
     pub fn reset_scroll(&mut self) {
         self.preview_scroll = 0;
         self.preview_scroll_x = 0;
+    }
+
+    /// Adjust zoom (increase width when zooming out = more columns, or decrease width when zooming in = fewer columns)
+    /// When `zoom_in` is true we *magnify* (reduce columns) else we *zoom out* (increase columns)
+    pub fn adjust_zoom(&mut self, zoom_in: bool) {
+        match self.current_mode {
+            RenderMode::ImageToAscii => {
+                let width = self.ascii_state.width;
+                let new = zoom_step(width, zoom_in);
+                self.ascii_state.width = new;
+                self.set_status(&format!("ASCII width: {}", new), false);
+                self.trigger_render();
+            }
+            RenderMode::ImageToUnicode => {
+                let width = self.unicode_state.width;
+                let new = zoom_step(width, zoom_in);
+                self.unicode_state.width = new;
+                self.set_status(&format!("Unicode width: {}", new), false);
+                self.trigger_render();
+            }
+            RenderMode::TextStylizer => {
+                // Text stylizer width not applicable
+                self.set_status("Zoom not applicable for Text Stylizer", true);
+            }
+        }
+    }
+}
+
+/// Compute a zoom step size for given width. Zoom in reduces width, zoom out increases width.
+fn zoom_step(width: usize, zoom_in: bool) -> usize {
+    if zoom_in {
+        // Reduce width by ~20%, clamp to at least 10
+        let new = (width * 4) / 5;
+        new.max(10)
+    } else {
+        // Increase width by ~25%, clamp to a reasonable maximum
+        let new = (width * 5) / 4;
+        new.min(4000)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zoom_step_behaviour() {
+        assert_eq!(zoom_step(80, true), 64); // zoom in
+        assert_eq!(zoom_step(80, false), 100); // zoom out
+        assert_eq!(zoom_step(12, true), 10); // min clamp
+        assert!(zoom_step(4000, false) <= 4000);
     }
 }
