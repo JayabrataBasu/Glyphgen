@@ -116,11 +116,11 @@ fn create_help_text() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  O           ", key_style),
-            Span::styled("Cycle output format (ANSI/HTML)", desc_style),
+            Span::styled("Cycle output format", desc_style),
         ]),
         Line::from(vec![
-            Span::styled("  Output Format ", key_style),
-            Span::styled("Change in Control Panel with ←/→ (ANSI/HTML)", desc_style),
+            Span::styled("  Output Fmt  ", key_style),
+            Span::styled("ANSI/HTML/TXT/PNG/SVG (TXT only for ASCII)", desc_style),
         ]),
         Line::from(Span::styled("", Style::default())),
         Line::from(Span::styled("Preview Area", section_style)),

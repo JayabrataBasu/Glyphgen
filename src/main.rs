@@ -248,28 +248,51 @@ fn run_render_once(
     if let Ok(response) = workers.response_rx.recv_timeout(Duration::from_secs(10)) {
         match response {
             glyphgen::worker::WorkerResponse::AsciiComplete { output, render_time } => {
-                let out_file = "ascii_output.txt";
-                std::fs::write(out_file, output)?;
+                // ASCII mode: save based on format
+                let (out_file, content) = match output_format.unwrap_or("txt") {
+                    "html" => (
+                        "ascii_output.html",
+                        glyphgen::input::convert_ansi_to_html(&output),
+                    ),
+                    "ansi" => ("ascii_output.ansi", output),
+                    _ => ("ascii_output.txt", output),
+                };
+                std::fs::write(out_file, content)?;
                 println!("Saved ASCII output to {} ({}ms)", out_file, render_time);
             }
             glyphgen::worker::WorkerResponse::UnicodeComplete { output, render_time } => {
-                match output_format {
-                    Some("html") => {
-                        let out_file = "unicode_output.html";
-                        let html = glyphgen::input::convert_ansi_to_html(&output);
-                        std::fs::write(out_file, html)?;
-                        println!("Saved Unicode output to {} ({}ms)", out_file, render_time);
+                // Unicode mode: ANSI/HTML/PNG/SVG only (no TXT)
+                let (out_file, content) = match output_format.unwrap_or("ansi") {
+                    "html" => (
+                        "unicode_output.html",
+                        glyphgen::input::convert_ansi_to_html(&output),
+                    ),
+                    "png" => {
+                        glyphgen::input::export_to_png(&output, "unicode_output.png")?;
+                        println!("Saved Unicode PNG to unicode_output.png ({}ms)", render_time);
+                        return Ok(());
                     }
-                    _ => {
-                        let out_file = "unicode_output.ansi";
-                        std::fs::write(out_file, output)?;
-                        println!("Saved Unicode output to {} ({}ms)", out_file, render_time);
+                    "svg" => {
+                        glyphgen::input::export_to_svg(&output, "unicode_output.svg")?;
+                        println!("Saved Unicode SVG to unicode_output.svg ({}ms)", render_time);
+                        return Ok(());
                     }
-                }
+                    _ => ("unicode_output.ansi", output),
+                };
+                std::fs::write(out_file, content)?;
+                println!("Saved Unicode output to {} ({}ms)", out_file, render_time);
             }
             glyphgen::worker::WorkerResponse::TextComplete { output, render_time } => {
-                let out_file = "styled_text.txt";
-                std::fs::write(out_file, output)?;
+                // Text stylizer: save based on format
+                let (out_file, content) = match output_format.unwrap_or("txt") {
+                    "html" => (
+                        "styled_text.html",
+                        glyphgen::input::convert_ansi_to_html(&output),
+                    ),
+                    "ansi" => ("styled_text.ansi", output),
+                    _ => ("styled_text.txt", output),
+                };
+                std::fs::write(out_file, content)?;
                 println!("Saved text output to {} ({}ms)", out_file, render_time);
             }
             glyphgen::worker::WorkerResponse::Error(err) => {

@@ -45,12 +45,10 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
             return Ok(());
         }
         KeyCode::Char('o') | KeyCode::Char('O') => {
-            // Cycle output format
-            state.preview_output_format = match state.preview_output_format {
-                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
-                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
-            };
-            state.set_status(&format!("Output format: {:?}", state.preview_output_format), false);
+            // Cycle output format based on current mode
+            let is_unicode = matches!(state.current_mode, RenderMode::ImageToUnicode);
+            state.preview_output_format = state.preview_output_format.next_for_mode(is_unicode);
+            state.set_status(&format!("Output format: {}", state.preview_output_format.name()), false);
             return Ok(());
         }
         KeyCode::Tab => {
@@ -275,28 +273,19 @@ fn adjust_setting_left(state: &mut AppState) {
     match state.current_mode {
         RenderMode::ImageToAscii => match state.ascii_state.selected_setting {
             1 => state.ascii_state.charset = state.ascii_state.charset.prev(),
-            4 => state.preview_output_format = match state.preview_output_format {
-                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
-                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
-            },
+            4 => state.preview_output_format = state.preview_output_format.prev_for_mode(false),
             _ => {}
         },
         RenderMode::ImageToUnicode => match state.unicode_state.selected_setting {
             1 => state.unicode_state.mode = state.unicode_state.mode.prev(),
             2 => state.unicode_state.color_mode = state.unicode_state.color_mode.prev(),
-            3 => state.preview_output_format = match state.preview_output_format {
-                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
-                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
-            },
+            3 => state.preview_output_format = state.preview_output_format.prev_for_mode(true),
             _ => {}
         },
         RenderMode::TextStylizer => match state.text_state.selected_setting {
             0 => state.text_state.style = state.text_state.style.prev(),
             1 => state.text_state.gradient = state.text_state.gradient.prev(),
-            5 => state.preview_output_format = match state.preview_output_format {
-                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
-                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
-            },
+            5 => state.preview_output_format = state.preview_output_format.prev_for_mode(false),
             _ => {}
         },
     }
@@ -307,28 +296,19 @@ fn adjust_setting_right(state: &mut AppState) {
     match state.current_mode {
         RenderMode::ImageToAscii => match state.ascii_state.selected_setting {
             1 => state.ascii_state.charset = state.ascii_state.charset.next(),
-            4 => state.preview_output_format = match state.preview_output_format {
-                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
-                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
-            },
+            4 => state.preview_output_format = state.preview_output_format.next_for_mode(false),
             _ => {}
         },
         RenderMode::ImageToUnicode => match state.unicode_state.selected_setting {
             1 => state.unicode_state.mode = state.unicode_state.mode.next(),
             2 => state.unicode_state.color_mode = state.unicode_state.color_mode.next(),
-            3 => state.preview_output_format = match state.preview_output_format {
-                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
-                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
-            },
+            3 => state.preview_output_format = state.preview_output_format.next_for_mode(true),
             _ => {}
         },
         RenderMode::TextStylizer => match state.text_state.selected_setting {
             0 => state.text_state.style = state.text_state.style.next(),
             1 => state.text_state.gradient = state.text_state.gradient.next(),
-            5 => state.preview_output_format = match state.preview_output_format {
-                crate::state::OutputFormat::Ansi => crate::state::OutputFormat::Html,
-                crate::state::OutputFormat::Html => crate::state::OutputFormat::Ansi,
-            },
+            5 => state.preview_output_format = state.preview_output_format.next_for_mode(false),
             _ => {}
         },
     }
@@ -404,10 +384,11 @@ fn save_output(state: &mut AppState) -> Result<()> {
             RenderMode::TextStylizer => "styled_text",
         };
 
+        let is_unicode = matches!(state.current_mode, RenderMode::ImageToUnicode);
+
         match state.preview_output_format {
             crate::state::OutputFormat::Ansi => {
                 let filename = format!("{}.ansi", base);
-                // Save raw ANSI content as-is
                 match std::fs::write(&filename, content) {
                     Ok(_) => state.set_status(&format!("Saved to {}", filename), false),
                     Err(e) => state.set_status(&format!("Save failed: {}", e), true),
@@ -419,6 +400,32 @@ fn save_output(state: &mut AppState) -> Result<()> {
                 match std::fs::write(&filename, html) {
                     Ok(_) => state.set_status(&format!("Saved to {}", filename), false),
                     Err(e) => state.set_status(&format!("Save failed: {}", e), true),
+                }
+            }
+            crate::state::OutputFormat::Txt => {
+                if is_unicode {
+                    state.set_status("TXT not supported for Unicode (use HTML/PNG/SVG)", true);
+                } else {
+                    let filename = format!("{}.txt", base);
+                    let clean = strip_ansi_codes(content);
+                    match std::fs::write(&filename, clean) {
+                        Ok(_) => state.set_status(&format!("Saved to {}", filename), false),
+                        Err(e) => state.set_status(&format!("Save failed: {}", e), true),
+                    }
+                }
+            }
+            crate::state::OutputFormat::Png => {
+                let filename = format!("{}.png", base);
+                match export_to_png(content, &filename) {
+                    Ok(_) => state.set_status(&format!("Saved to {}", filename), false),
+                    Err(e) => state.set_status(&format!("PNG export failed: {}", e), true),
+                }
+            }
+            crate::state::OutputFormat::Svg => {
+                let filename = format!("{}.svg", base);
+                match export_to_svg(content, &filename) {
+                    Ok(_) => state.set_status(&format!("Saved to {}", filename), false),
+                    Err(e) => state.set_status(&format!("SVG export failed: {}", e), true),
                 }
             }
         }
@@ -673,6 +680,202 @@ fn parse_sgr_params(params: &str, fg: &mut Option<ratatui::style::Color>, bg: &m
             _ => {}
         }
         i += 1;
+    }
+}
+
+/// Export content to PNG using bundled font
+pub fn export_to_png(content: &str, path: &str) -> Result<()> {
+    use ab_glyph::{FontRef, PxScale};
+    use image::{Rgb, RgbImage};
+
+    // Load bundled font
+    const FONT_BYTES: &[u8] = include_bytes!("../assets/fonts/DejaVuSansMono.ttf");
+    let font = FontRef::try_from_slice(FONT_BYTES)
+        .map_err(|e| anyhow::anyhow!("Failed to load font: {}", e))?;
+
+    // Configuration
+    let font_size = 14.0f32;
+    let scale = PxScale::from(font_size);
+    let cell_width = (font_size * 0.6) as u32; // Approximate monospace width
+    let cell_height = (font_size * 1.2) as u32;
+
+    // Parse content dimensions
+    let lines: Vec<&str> = content.lines().collect();
+    let max_chars = lines.iter().map(|l| strip_ansi_codes(l).chars().count()).max().unwrap_or(0);
+    let num_lines = lines.len();
+
+    if max_chars == 0 || num_lines == 0 {
+        return Err(anyhow::anyhow!("Empty content"));
+    }
+
+    let img_width = (max_chars as u32 * cell_width).max(1);
+    let img_height = (num_lines as u32 * cell_height).max(1);
+
+    // Create image with black background
+    let mut img = RgbImage::from_pixel(img_width, img_height, Rgb([0, 0, 0]));
+
+    // Render each line
+    for (line_idx, line) in lines.iter().enumerate() {
+        let spans = parse_ansi_to_spans(line);
+        let mut char_x = 0u32;
+
+        for (text, fg, bg) in spans {
+            for ch in text.chars() {
+                let px = char_x * cell_width;
+                let py = line_idx as u32 * cell_height;
+
+                // Draw background rectangle
+                if let Some(bg_color) = bg {
+                    let (br, bg_val, bb) = color_to_rgb(&bg_color);
+                    for dy in 0..cell_height {
+                        for dx in 0..cell_width {
+                            if px + dx < img_width && py + dy < img_height {
+                                img.put_pixel(px + dx, py + dy, Rgb([br, bg_val, bb]));
+                            }
+                        }
+                    }
+                }
+
+                // Draw glyph
+                let (fr, fg_val, fb) = fg.as_ref().map(color_to_rgb).unwrap_or((255, 255, 255));
+                imageproc::drawing::draw_text_mut(
+                    &mut img,
+                    Rgb([fr, fg_val, fb]),
+                    px as i32,
+                    py as i32,
+                    scale,
+                    &font,
+                    &ch.to_string(),
+                );
+
+                char_x += 1;
+            }
+        }
+    }
+
+    img.save(path).map_err(|e| anyhow::anyhow!("Failed to save PNG: {}", e))?;
+    Ok(())
+}
+
+/// Export content to SVG
+pub fn export_to_svg(content: &str, path: &str) -> Result<()> {
+    let lines: Vec<&str> = content.lines().collect();
+    let max_chars = lines.iter().map(|l| strip_ansi_codes(l).chars().count()).max().unwrap_or(0);
+    let num_lines = lines.len();
+
+    let cell_width = 8.4; // Approximate monospace character width
+    let cell_height = 16.8;
+    let font_size = 14.0;
+
+    let svg_width = max_chars as f64 * cell_width;
+    let svg_height = num_lines as f64 * cell_height;
+
+    let mut svg = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" style="background:#000">
+<style>text {{ font-family: 'DejaVu Sans Mono', 'Courier New', monospace; font-size: {}px; }}</style>
+"#,
+        svg_width, svg_height, font_size
+    );
+
+    for (line_idx, line) in lines.iter().enumerate() {
+        let spans = parse_ansi_to_spans(line);
+        let mut char_x = 0usize;
+        let y = (line_idx as f64 + 1.0) * cell_height - 4.0; // Baseline offset
+
+        for (text, fg, bg) in spans {
+            for ch in text.chars() {
+                let x = char_x as f64 * cell_width;
+
+                // Draw background rect if present
+                if let Some(bg_color) = bg {
+                    let (br, bg_val, bb) = color_to_rgb(&bg_color);
+                    svg.push_str(&format!(
+                        r#"<rect x="{}" y="{}" width="{}" height="{}" fill="rgb({},{},{})"/>"#,
+                        x,
+                        line_idx as f64 * cell_height,
+                        cell_width,
+                        cell_height,
+                        br, bg_val, bb
+                    ));
+                }
+
+                // Draw character
+                let (fr, fg_val, fb) = fg.as_ref().map(color_to_rgb).unwrap_or((255, 255, 255));
+                let escaped = match ch {
+                    '<' => "&lt;".to_string(),
+                    '>' => "&gt;".to_string(),
+                    '&' => "&amp;".to_string(),
+                    '"' => "&quot;".to_string(),
+                    _ => ch.to_string(),
+                };
+                svg.push_str(&format!(
+                    r#"<text x="{}" y="{}" fill="rgb({},{},{})">{}</text>"#,
+                    x, y, fr, fg_val, fb, escaped
+                ));
+
+                char_x += 1;
+            }
+        }
+    }
+
+    svg.push_str("</svg>");
+    std::fs::write(path, svg).map_err(|e| anyhow::anyhow!("Failed to save SVG: {}", e))?;
+    Ok(())
+}
+
+/// Convert ratatui Color to RGB tuple
+fn color_to_rgb(color: &ratatui::style::Color) -> (u8, u8, u8) {
+    match color {
+        ratatui::style::Color::Rgb(r, g, b) => (*r, *g, *b),
+        ratatui::style::Color::Black => (0, 0, 0),
+        ratatui::style::Color::Red => (255, 0, 0),
+        ratatui::style::Color::Green => (0, 255, 0),
+        ratatui::style::Color::Yellow => (255, 255, 0),
+        ratatui::style::Color::Blue => (0, 0, 255),
+        ratatui::style::Color::Magenta => (255, 0, 255),
+        ratatui::style::Color::Cyan => (0, 255, 255),
+        ratatui::style::Color::White => (255, 255, 255),
+        ratatui::style::Color::Indexed(n) => indexed_color_to_rgb(*n),
+        _ => (255, 255, 255),
+    }
+}
+
+/// Convert 256-index color to RGB
+fn indexed_color_to_rgb(n: u8) -> (u8, u8, u8) {
+    let n = n as i32;
+    if n < 16 {
+        match n {
+            0 => (0, 0, 0),
+            1 => (128, 0, 0),
+            2 => (0, 128, 0),
+            3 => (128, 128, 0),
+            4 => (0, 0, 128),
+            5 => (128, 0, 128),
+            6 => (0, 128, 128),
+            7 => (192, 192, 192),
+            8 => (128, 128, 128),
+            9 => (255, 0, 0),
+            10 => (0, 255, 0),
+            11 => (255, 255, 0),
+            12 => (0, 0, 255),
+            13 => (255, 0, 255),
+            14 => (0, 255, 255),
+            15 => (255, 255, 255),
+            _ => (0, 0, 0),
+        }
+    } else if n >= 16 && n <= 231 {
+        let idx = n - 16;
+        let b = (idx % 6) as u8;
+        let g = ((idx / 6) % 6) as u8;
+        let r = ((idx / 36) % 6) as u8;
+        let r = if r == 0 { 0 } else { r * 40 + 55 };
+        let g = if g == 0 { 0 } else { g * 40 + 55 };
+        let b = if b == 0 { 0 } else { b * 40 + 55 };
+        (r, g, b)
+    } else {
+        let shade = (8 + (n - 232) * 10) as u8;
+        (shade, shade, shade)
     }
 }
 

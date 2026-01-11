@@ -18,6 +18,10 @@ crossterm = "0.27"
 # Image Processing
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 
+# Font rendering for PNG/SVG export
+ab_glyph = "0.2"
+imageproc = "0.25"
+
 # Color Handling
 palette = "0.7"
 

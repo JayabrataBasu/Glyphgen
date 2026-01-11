@@ -74,7 +74,22 @@ glyphgen
 
 # Load an image using environment variable
 GLYPHGEN_IMAGE=path/to/image.png glyphgen
+
+# Load an image via command line
+glyphgen --image path/to/image.png
+
+# Render once and save (batch mode)
+glyphgen --image photo.jpg --render-once --mode unicode --output-format png
 ```
+
+#### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `--image PATH` | Load image from path |
+| `--render-once` | Render immediately and exit (batch mode) |
+| `--mode MODE` | Render mode: `ascii`, `unicode`, or `text` |
+| `--output-format FMT` | Output format: `ansi`, `html`, `txt`, `png`, `svg` |
 
 ### Keyboard Controls
 
@@ -112,6 +127,24 @@ GLYPHGEN_IMAGE=path/to/image.png glyphgen
 | `Home` `End` | Jump to top/bottom |
 | `C` | Copy to clipboard |
 | `S` | Save output |
+
+### Output Formats
+
+Glyphgen supports multiple output formats for saving your art:
+
+| Format | Extension | Description | ASCII Mode | Unicode Mode |
+|--------|-----------|-------------|------------|--------------|
+| **ANSI** | `.ansi` | Raw ANSI escape codes (terminal compatible) | ✓ | ✓ |
+| **HTML** | `.html` | HTML with inline CSS colors | ✓ | ✓ |
+| **TXT** | `.txt` | Plain text without colors | ✓ | ✗ |
+| **PNG** | `.png` | Rasterized image with bundled font | ✓ | ✓ |
+| **SVG** | `.svg` | Vector graphics with text elements | ✓ | ✓ |
+
+**Note:** TXT format is excluded from Unicode mode because Unicode block characters rely on colors for proper display.
+
+To change the output format:
+- Press `O` to cycle through available formats
+- Or adjust "Output Format" in the Control Panel using `←` `→`
 
 ### Configuration
 

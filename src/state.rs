@@ -286,6 +286,9 @@ pub struct AppState {
 pub enum OutputFormat {
     Ansi,
     Html,
+    Txt,
+    Png,
+    Svg,
 }
 
 impl Default for OutputFormat {
@@ -299,7 +302,53 @@ impl OutputFormat {
         match self {
             OutputFormat::Ansi => "ANSI",
             OutputFormat::Html => "HTML",
+            OutputFormat::Txt => "TXT",
+            OutputFormat::Png => "PNG",
+            OutputFormat::Svg => "SVG",
         }
+    }
+
+    /// Get available formats for ASCII mode
+    pub fn ascii_formats() -> &'static [OutputFormat] {
+        &[
+            OutputFormat::Ansi,
+            OutputFormat::Html,
+            OutputFormat::Txt,
+            OutputFormat::Png,
+            OutputFormat::Svg,
+        ]
+    }
+
+    /// Get available formats for Unicode mode (no TXT - breaks display)
+    pub fn unicode_formats() -> &'static [OutputFormat] {
+        &[
+            OutputFormat::Ansi,
+            OutputFormat::Html,
+            OutputFormat::Png,
+            OutputFormat::Svg,
+        ]
+    }
+
+    /// Cycle to next format within allowed list
+    pub fn next_for_mode(self, is_unicode: bool) -> Self {
+        let formats = if is_unicode {
+            Self::unicode_formats()
+        } else {
+            Self::ascii_formats()
+        };
+        let idx = formats.iter().position(|&f| f == self).unwrap_or(0);
+        formats[(idx + 1) % formats.len()]
+    }
+
+    /// Cycle to previous format within allowed list
+    pub fn prev_for_mode(self, is_unicode: bool) -> Self {
+        let formats = if is_unicode {
+            Self::unicode_formats()
+        } else {
+            Self::ascii_formats()
+        };
+        let idx = formats.iter().position(|&f| f == self).unwrap_or(0);
+        formats[(idx + formats.len() - 1) % formats.len()]
     }
 }
 
