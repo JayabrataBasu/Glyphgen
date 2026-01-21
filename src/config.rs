@@ -70,6 +70,8 @@ pub struct AsciiPreferences {
     pub default_charset: CharacterSet,
     pub default_width: usize,
     pub edge_enhance: bool,
+    #[serde(default = "default_ascii_color")]
+    pub default_color: String,
 }
 
 impl Default for AsciiPreferences {
@@ -78,8 +80,13 @@ impl Default for AsciiPreferences {
             default_charset: CharacterSet::Extended,
             default_width: 80,
             edge_enhance: false,
+            default_color: default_ascii_color(),
         }
     }
+}
+
+fn default_ascii_color() -> String {
+    "TrueColor".to_string()
 }
 
 /// Unicode rendering preferences

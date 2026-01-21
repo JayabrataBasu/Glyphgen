@@ -6,6 +6,9 @@ use anyhow::Result;
 use image::{DynamicImage, GenericImageView, GrayImage, Luma};
 use serde::{Deserialize, Serialize};
 
+use crate::color_space::{format_fg_color, Rgb, ANSI_RESET};
+use crate::terminal_capabilities::ColorSupport;
+
 /// Character set for ASCII rendering
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CharacterSet {
@@ -72,6 +75,7 @@ pub struct AsciiConfig {
     pub charset: CharacterSet,
     pub invert: bool,
     pub edge_enhance: bool,
+    pub color_mode: ColorSupport,
 }
 
 impl Default for AsciiConfig {
@@ -81,6 +85,7 @@ impl Default for AsciiConfig {
             charset: CharacterSet::Extended,
             invert: false,
             edge_enhance: false,
+            color_mode: ColorSupport::default(),
         }
     }
 }
@@ -112,10 +117,27 @@ pub fn render_ascii(image: &DynamicImage, config: &AsciiConfig) -> Result<String
     let charset_chars: Vec<char> = config.charset.chars().chars().collect();
     let num_chars = charset_chars.len();
 
-    let mut output = String::with_capacity((width + 1) * height);
+    // Determine if we should use color
+    let use_color = config.color_mode != ColorSupport::NoColor;
+
+    let mut output = String::with_capacity((width + 30) * height);
+    let mut current_color: Option<Rgb> = None;
 
     for y in 0..height {
         for x in 0..width {
+            // Sample RGB for color (before grayscale conversion)
+            let rgb = if use_color {
+                let pixel = resized.get_pixel(x as u32, y as u32);
+                Rgb {
+                    r: pixel[0],
+                    g: pixel[1],
+                    b: pixel[2],
+                }
+            } else {
+                Rgb { r: 0, g: 0, b: 0 } // Unused
+            };
+
+            // Get grayscale luminance for character selection
             let pixel = processed.get_pixel(x as u32, y as u32);
             let luminance = pixel.0[0] as f32 / 255.0;
 
@@ -129,8 +151,27 @@ pub fn render_ascii(image: &DynamicImage, config: &AsciiConfig) -> Result<String
             // Map luminance to character index
             let index = (luminance * (num_chars - 1) as f32).round() as usize;
             let index = index.min(num_chars - 1);
+            let ch = charset_chars[index];
 
-            output.push(charset_chars[index]);
+            // Emit color code only when color changes (run-length encoding)
+            if use_color {
+                let color_changed = current_color.map_or(true, |c| c != rgb);
+                if color_changed {
+                    if current_color.is_some() {
+                        output.push_str(ANSI_RESET);
+                    }
+                    output.push_str(&format_fg_color(rgb, config.color_mode));
+                    current_color = Some(rgb);
+                }
+            }
+
+            output.push(ch);
+        }
+
+        // Reset color at line end
+        if use_color && current_color.is_some() {
+            output.push_str(ANSI_RESET);
+            current_color = None;
         }
         output.push('\n');
     }
@@ -260,6 +301,7 @@ mod tests {
             charset: CharacterSet::Standard,
             invert: false,
             edge_enhance: false,
+            color_mode: ColorSupport::NoColor,
         };
 
         let result = render_ascii(&DynamicImage::ImageRgb8(img), &config).unwrap();

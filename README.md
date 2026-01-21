@@ -8,6 +8,7 @@ A high-performance Terminal User Interface (TUI) application for converting imag
 ## Features
 
 ### Image to ASCII Art
+
 - Convert images (PNG, JPEG, GIF, WebP, BMP) to ASCII art
 - Multiple character sets: Standard, Extended, Unicode Blocks
 - Adjustable output width
@@ -15,6 +16,7 @@ A high-performance Terminal User Interface (TUI) application for converting imag
 - Real-time preview
 
 ### Image to Unicode Art
+
 - High-fidelity Unicode rendering with color support
 - Multiple modes:
   - **Blocks**: Simple block characters (░▒▓█)
@@ -24,6 +26,7 @@ A high-performance Terminal User Interface (TUI) application for converting imag
 - Automatic terminal capability detection
 
 ### Text Stylizer
+
 - Convert plain text to stylized Unicode
 - 14 Unicode styles including:
   - Bold (𝐀𝐁𝐂), Italic (𝐴𝐵𝐶), Bold Italic (𝑨𝑩𝑪)
@@ -33,6 +36,7 @@ A high-performance Terminal User Interface (TUI) application for converting imag
 - Gradient coloring (horizontal, rainbow)
 
 ### Performance
+
 - 60 FPS UI with non-blocking rendering
 - Multi-threaded rendering on worker threads
 - Sub-100ms render times for typical images
@@ -85,7 +89,7 @@ glyphgen --image photo.jpg --render-once --mode unicode --output-format png
 #### CLI Options
 
 | Option | Description |
-|--------|-------------|
+|________ | ____________ |
 | `--image PATH` | Load image from path |
 | `--render-once` | Render immediately and exit (batch mode) |
 | `--mode MODE` | Render mode: `ascii`, `unicode`, or `text` |
@@ -94,8 +98,9 @@ glyphgen --image photo.jpg --render-once --mode unicode --output-format png
 ### Keyboard Controls
 
 #### Global
+
 | Key | Action |
-|-----|--------|
+| ----- | -------- |
 | `Q` | Quit application |
 | `?` | Toggle help overlay |
 | `Tab` | Next widget |
@@ -103,15 +108,17 @@ glyphgen --image photo.jpg --render-once --mode unicode --output-format png
 | `Esc` | Cancel / Close overlay |
 
 #### Mode Selector
+
 | Key | Action |
-|-----|--------|
+| ----- | -------- |
 | `1`, `2`, `3` | Jump to mode |
 | `↑` `↓` | Navigate modes |
 | `Enter` | Select mode |
 
 #### Control Panel
+
 | Key | Action |
-|-----|--------|
+|____ |________|
 | `↑` `↓` | Navigate settings |
 | `←` `→` | Adjust selection |
 | `+` `-` | Adjust numeric values |
@@ -120,8 +127,9 @@ glyphgen --image photo.jpg --render-once --mode unicode --output-format png
 | `S` | Save output |
 
 #### Preview Area
+
 | Key | Action |
-|-----|--------|
+| ----- | -------- |
 | `↑` `↓` | Scroll by line |
 | `PgUp` `PgDn` | Scroll by page |
 | `Home` `End` | Jump to top/bottom |
@@ -133,7 +141,7 @@ glyphgen --image photo.jpg --render-once --mode unicode --output-format png
 Glyphgen supports multiple output formats for saving your art:
 
 | Format | Extension | Description | ASCII Mode | Unicode Mode |
-|--------|-----------|-------------|------------|--------------|
+|_______ |__________ |____________ |___________ |______________|
 | **ANSI** | `.ansi` | Raw ANSI escape codes (terminal compatible) | ✓ | ✓ |
 | **HTML** | `.html` | HTML with inline CSS colors | ✓ | ✓ |
 | **TXT** | `.txt` | Plain text without colors | ✓ | ✗ |
@@ -143,12 +151,14 @@ Glyphgen supports multiple output formats for saving your art:
 **Note:** TXT format is excluded from Unicode mode because Unicode block characters rely on colors for proper display.
 
 To change the output format:
+
 - Press `O` to cycle through available formats
 - Or adjust "Output Format" in the Control Panel using `←` `→`
 
 ### Configuration
 
 Configuration is automatically saved to:
+
 - Linux: `~/.config/glyphgen/config.toml`
 - macOS: `~/Library/Application Support/glyphgen/config.toml`
 - Windows: `%APPDATA%\glyphgen\config.toml`
@@ -176,7 +186,7 @@ word_wrap = false
 
 ## Architecture
 
-```
+```arch
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Application Layer                        │
 │  ┌────────────────┐  ┌────────────────┐  ┌──────────────────┐  │
@@ -225,7 +235,7 @@ RUST_LOG=debug cargo run
 
 ### Project Structure
 
-```
+```list
 src/
 ├── main.rs              # Entry point, event loop
 ├── lib.rs               # Library exports
@@ -250,12 +260,12 @@ src/
     └── text_stylizer.rs # Text stylization
 ```
 
-## Performance
+## Operations
 
 Typical render times on modern hardware:
 
 | Operation | Image Size | Output Width | Time |
-|-----------|------------|--------------|------|
+|__________ |___________ |_____________ |_____ |
 | ASCII | 800×600 | 80 | ~20ms |
 | ASCII | 1920×1080 | 120 | ~35ms |
 | Unicode (HalfBlocks) | 800×600 | 80 | ~40ms |
@@ -283,6 +293,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [image](https://github.com/image-rs/image) - Rust image processing library
 
 ---
-
-# Glyphgen
-An Ascii generator

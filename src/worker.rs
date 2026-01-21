@@ -24,6 +24,7 @@ pub enum WorkerMessage {
         charset: CharacterSet,
         invert: bool,
         edge_enhance: bool,
+        color_mode: ColorSupport,
     },
     /// Request Unicode rendering
     UnicodeRequest {
@@ -122,11 +123,13 @@ fn worker_loop(rx: Receiver<WorkerMessage>, tx: Sender<WorkerResponse>) {
                 charset,
                 invert,
                 edge_enhance,
+                            color_mode,
             } => {
                 let start = Instant::now();
 
                 let config = AsciiConfig {
                     target_width: width,
+                                        color_mode,
                     charset,
                     invert,
                     edge_enhance,
@@ -223,6 +226,7 @@ mod tests {
                 charset: CharacterSet::Standard,
                 invert: false,
                 edge_enhance: false,
+                color_mode: ColorSupport::NoColor,
             })
             .unwrap();
 

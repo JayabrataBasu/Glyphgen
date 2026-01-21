@@ -31,6 +31,7 @@ fn benchmark_ascii_render(c: &mut Criterion) {
             charset: CharacterSet::Extended,
             invert: false,
             edge_enhance: false,
+            color_mode: ColorSupport::NoColor,
         };
 
         group.bench_function(format!("width_{}", width), |b| {
@@ -49,6 +50,7 @@ fn benchmark_ascii_with_edge_enhance(c: &mut Criterion) {
         charset: CharacterSet::Extended,
         invert: false,
         edge_enhance: false,
+        color_mode: ColorSupport::NoColor,
     };
 
     let config_with = AsciiConfig {
@@ -56,6 +58,7 @@ fn benchmark_ascii_with_edge_enhance(c: &mut Criterion) {
         charset: CharacterSet::Extended,
         invert: false,
         edge_enhance: true,
+        color_mode: ColorSupport::NoColor,
     };
 
     let mut group = c.benchmark_group("ASCII Edge Enhancement");

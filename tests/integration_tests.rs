@@ -41,6 +41,7 @@ mod ascii_tests {
             charset: CharacterSet::Standard,
             invert: false,
             edge_enhance: false,
+            color_mode: ColorSupport::NoColor,
         };
 
         let result = render_ascii(&image, &config).unwrap();
@@ -67,6 +68,7 @@ mod ascii_tests {
                 charset: charset.clone(),
                 invert: false,
                 edge_enhance: false,
+                color_mode: ColorSupport::NoColor,
             };
 
             let result = render_ascii(&image, &config).unwrap();
@@ -83,6 +85,7 @@ mod ascii_tests {
             charset: CharacterSet::Standard,
             invert: false,
             edge_enhance: false,
+            color_mode: ColorSupport::NoColor,
         };
 
         let config_inverted = AsciiConfig {
@@ -90,6 +93,7 @@ mod ascii_tests {
             charset: CharacterSet::Standard,
             invert: true,
             edge_enhance: false,
+            color_mode: ColorSupport::NoColor,
         };
 
         let result_normal = render_ascii(&image, &config_normal).unwrap();
@@ -108,6 +112,7 @@ mod ascii_tests {
             charset: CharacterSet::Extended,
             invert: false,
             edge_enhance: false,
+            color_mode: ColorSupport::NoColor,
         };
 
         let config_enhanced = AsciiConfig {
@@ -115,6 +120,7 @@ mod ascii_tests {
             charset: CharacterSet::Extended,
             invert: false,
             edge_enhance: true,
+            color_mode: ColorSupport::NoColor,
         };
 
         let result_normal = render_ascii(&image, &config_normal).unwrap();
@@ -135,12 +141,51 @@ mod ascii_tests {
                 charset: CharacterSet::Extended,
                 invert: false,
                 edge_enhance: false,
+                color_mode: ColorSupport::NoColor,
             };
 
             let result = render_ascii(&image, &config).unwrap();
             let first_line = result.lines().next().unwrap();
             assert_eq!(first_line.chars().count(), width, "Width mismatch for {}", width);
         }
+    }
+
+    #[test]
+    fn test_ascii_colorized_contains_ansi() {
+        let image = create_color_image(60, 40);
+        let config = AsciiConfig {
+            target_width: 40,
+            charset: CharacterSet::Extended,
+            invert: false,
+            edge_enhance: false,
+            color_mode: ColorSupport::TrueColor,
+        };
+
+        let result = render_ascii(&image, &config).unwrap();
+
+        // Should contain ANSI foreground codes and resets
+        assert!(result.contains("\u{1b}[38;"));
+        assert!(result.contains("\u{1b}[0m"));
+
+        // Color run batching: number of color changes should be well below total chars
+        let color_changes = result.matches("\u{1b}[38;").count();
+        let total_chars: usize = result.lines().map(|l| l.chars().count()).sum();
+        assert!(color_changes < total_chars / 2, "Too many color changes: {} vs chars {}", color_changes, total_chars);
+    }
+
+    #[test]
+    fn test_ascii_no_color_has_no_ansi() {
+        let image = create_color_image(40, 30);
+        let config = AsciiConfig {
+            target_width: 30,
+            charset: CharacterSet::Extended,
+            invert: false,
+            edge_enhance: false,
+            color_mode: ColorSupport::NoColor,
+        };
+
+        let result = render_ascii(&image, &config).unwrap();
+        assert!(!result.contains("\u{1b}["));
     }
 }
 

@@ -6,6 +6,7 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::state::{AppState, FocusedWidget, RenderMode};
+use crate::terminal_capabilities::ColorSupport;
 
 /// Handle an input event
 pub fn handle_event(event: Event, state: &mut AppState) -> Result<()> {
@@ -44,10 +45,12 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
             state.show_help = true;
             return Ok(());
         }
-        KeyCode::Char('o') | KeyCode::Char('O') => {
+           KeyCode::Char('o') | KeyCode::Char('O') => { 
             // Cycle output format based on current mode
             let is_unicode = matches!(state.current_mode, RenderMode::ImageToUnicode);
-            state.preview_output_format = state.preview_output_format.next_for_mode(is_unicode);
+               let ascii_has_color = state.ascii_state.color_mode != ColorSupport::NoColor;
+               state.preview_output_format =
+                   state.preview_output_format.next_for_mode(is_unicode, ascii_has_color);
             state.set_status(&format!("Output format: {}", state.preview_output_format.name()), false);
             return Ok(());
         }
@@ -166,6 +169,13 @@ fn handle_mode_selector_input(key: KeyEvent, state: &mut AppState) -> Result<()>
             state.start_load_prompt();
         }
         KeyCode::Char(' ') => state.trigger_render(),
+                KeyCode::Char('o') | KeyCode::Char('O') => {
+                    let is_unicode = matches!(state.current_mode, RenderMode::ImageToUnicode);
+                    let ascii_has_color = state.ascii_state.color_mode != ColorSupport::NoColor;
+                    state.preview_output_format =
+                        state.preview_output_format.next_for_mode(is_unicode, ascii_has_color);
+                    state.set_status(&format!("Output format: {}", state.preview_output_format.name()), false);
+                }
         KeyCode::Char('s') | KeyCode::Char('S') => save_output(state)?,
 
         _ => {}
@@ -273,19 +283,33 @@ fn adjust_setting_left(state: &mut AppState) {
     match state.current_mode {
         RenderMode::ImageToAscii => match state.ascii_state.selected_setting {
             1 => state.ascii_state.charset = state.ascii_state.charset.prev(),
-            4 => state.preview_output_format = state.preview_output_format.prev_for_mode(false),
+            4 => {
+                state.ascii_state.color_mode = state.ascii_state.color_mode.prev();
+                state.set_status(&format!("ASCII Color: {}", state.ascii_state.color_mode.name()), false);
+            }
+            5 => {
+                let ascii_has_color = state.ascii_state.color_mode != ColorSupport::NoColor;
+                state.preview_output_format =
+                    state.preview_output_format.prev_for_mode(false, ascii_has_color);
+            }
             _ => {}
         },
         RenderMode::ImageToUnicode => match state.unicode_state.selected_setting {
             1 => state.unicode_state.mode = state.unicode_state.mode.prev(),
             2 => state.unicode_state.color_mode = state.unicode_state.color_mode.prev(),
-            3 => state.preview_output_format = state.preview_output_format.prev_for_mode(true),
+            3 => {
+                state.preview_output_format = state.preview_output_format.prev_for_mode(true, true);
+            }
             _ => {}
         },
         RenderMode::TextStylizer => match state.text_state.selected_setting {
             0 => state.text_state.style = state.text_state.style.prev(),
             1 => state.text_state.gradient = state.text_state.gradient.prev(),
-            5 => state.preview_output_format = state.preview_output_format.prev_for_mode(false),
+            5 => {
+                let ascii_has_color = state.ascii_state.color_mode != ColorSupport::NoColor;
+                state.preview_output_format =
+                    state.preview_output_format.prev_for_mode(false, ascii_has_color);
+            }
             _ => {}
         },
     }
@@ -296,19 +320,33 @@ fn adjust_setting_right(state: &mut AppState) {
     match state.current_mode {
         RenderMode::ImageToAscii => match state.ascii_state.selected_setting {
             1 => state.ascii_state.charset = state.ascii_state.charset.next(),
-            4 => state.preview_output_format = state.preview_output_format.next_for_mode(false),
+            4 => {
+                state.ascii_state.color_mode = state.ascii_state.color_mode.next();
+                state.set_status(&format!("ASCII Color: {}", state.ascii_state.color_mode.name()), false);
+            }
+            5 => {
+                let ascii_has_color = state.ascii_state.color_mode != ColorSupport::NoColor;
+                state.preview_output_format =
+                    state.preview_output_format.next_for_mode(false, ascii_has_color);
+            }
             _ => {}
         },
         RenderMode::ImageToUnicode => match state.unicode_state.selected_setting {
             1 => state.unicode_state.mode = state.unicode_state.mode.next(),
             2 => state.unicode_state.color_mode = state.unicode_state.color_mode.next(),
-            3 => state.preview_output_format = state.preview_output_format.next_for_mode(true),
+            3 => {
+                state.preview_output_format = state.preview_output_format.next_for_mode(true, true);
+            }
             _ => {}
         },
         RenderMode::TextStylizer => match state.text_state.selected_setting {
             0 => state.text_state.style = state.text_state.style.next(),
             1 => state.text_state.gradient = state.text_state.gradient.next(),
-            5 => state.preview_output_format = state.preview_output_format.next_for_mode(false),
+            5 => {
+                let ascii_has_color = state.ascii_state.color_mode != ColorSupport::NoColor;
+                state.preview_output_format =
+                    state.preview_output_format.next_for_mode(false, ascii_has_color);
+            }
             _ => {}
         },
     }

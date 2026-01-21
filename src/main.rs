@@ -219,6 +219,7 @@ fn run_render_once(
                 charset: glyphgen::render_engines::ascii::CharacterSet::Extended,
                 invert: false,
                 edge_enhance: config_clone.ascii.edge_enhance,
+                color_mode: glyphgen::terminal_capabilities::ColorSupport::TrueColor,
             };
             let _ = workers.request_tx.send(msg);
         }

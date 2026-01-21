@@ -51,6 +51,14 @@ pub fn render_ascii_controls(frame: &mut Frame, area: Rect, state: &AppState, is
         Some("[Space]"),
     ));
 
+    // Color Mode setting
+    lines.push(create_setting_line(
+        "Color Mode",
+        state.ascii_state.color_mode.name(),
+        selected == 4 && is_focused,
+        Some("[←/→]"),
+    ));
+
     // Action buttons
     lines.push(Line::from(""));
     lines.push(create_action_line("[Space]", "Render"));
@@ -61,7 +69,7 @@ pub fn render_ascii_controls(frame: &mut Frame, area: Rect, state: &AppState, is
     lines.push(create_setting_line(
         "Output Format",
         state.preview_output_format.name(),
-        selected == 4 && is_focused,
+        selected == 5 && is_focused,
         Some("[←/→]"),
     ));
 

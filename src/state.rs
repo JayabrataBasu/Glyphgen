@@ -16,6 +16,17 @@ use crate::render_engines::{
 };
 use crate::terminal_capabilities::{ColorSupport, TerminalCapabilities};
 use crate::worker::{WorkerMessage, WorkerResponse};
+/// Parse color support from config string
+fn parse_color_support(s: &str) -> Option<ColorSupport> {
+    match s.to_lowercase().as_str() {
+        "none" | "nocolor" => Some(ColorSupport::NoColor),
+        "16" | "color16" => Some(ColorSupport::Color16),
+        "256" | "color256" => Some(ColorSupport::Color256),
+        "truecolor" | "true" => Some(ColorSupport::TrueColor),
+        _ => None,
+    }
+}
+
 
 /// Main render mode selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -81,6 +92,7 @@ pub struct AsciiRenderState {
     pub width: usize,
     pub invert: bool,
     pub edge_enhance: bool,
+    pub color_mode: ColorSupport,
     pub selected_setting: usize,
 }
 
@@ -91,6 +103,7 @@ impl Default for AsciiRenderState {
             width: 80,
             invert: false,
             edge_enhance: false,
+            color_mode: ColorSupport::default(),
             selected_setting: 0,
         }
     }
@@ -98,7 +111,7 @@ impl Default for AsciiRenderState {
 
 impl AsciiRenderState {
     pub fn settings_count() -> usize {
-        5 // width, charset, invert, edge_enhance, output_format
+        6 // width, charset, invert, edge_enhance, color_mode, output_format
     }
 
     pub fn setting_name(&self, index: usize) -> &'static str {
@@ -107,6 +120,7 @@ impl AsciiRenderState {
             1 => "Charset",
             2 => "Invert",
             3 => "Edge Enhance",
+            4 => "Color Mode",
             _ => "Unknown",
         }
     }
@@ -117,6 +131,7 @@ impl AsciiRenderState {
             1 => self.charset.name().to_string(),
             2 => if self.invert { "On" } else { "Off" }.to_string(),
             3 => if self.edge_enhance { "On" } else { "Off" }.to_string(),
+            4 => self.color_mode.name().to_string(),
             _ => String::new(),
         }
     }
@@ -319,6 +334,16 @@ impl OutputFormat {
         ]
     }
 
+    /// Get available formats for ASCII mode with color (no TXT)
+    pub fn ascii_formats_colored() -> &'static [OutputFormat] {
+        &[
+            OutputFormat::Ansi,
+            OutputFormat::Html,
+            OutputFormat::Png,
+            OutputFormat::Svg,
+        ]
+    }
+
     /// Get available formats for Unicode mode (no TXT - breaks display)
     pub fn unicode_formats() -> &'static [OutputFormat] {
         &[
@@ -330,9 +355,11 @@ impl OutputFormat {
     }
 
     /// Cycle to next format within allowed list
-    pub fn next_for_mode(self, is_unicode: bool) -> Self {
+    pub fn next_for_mode(self, is_unicode: bool, ascii_has_color: bool) -> Self {
         let formats = if is_unicode {
             Self::unicode_formats()
+        } else if ascii_has_color {
+            Self::ascii_formats_colored()
         } else {
             Self::ascii_formats()
         };
@@ -341,9 +368,11 @@ impl OutputFormat {
     }
 
     /// Cycle to previous format within allowed list
-    pub fn prev_for_mode(self, is_unicode: bool) -> Self {
+    pub fn prev_for_mode(self, is_unicode: bool, ascii_has_color: bool) -> Self {
         let formats = if is_unicode {
             Self::unicode_formats()
+        } else if ascii_has_color {
+            Self::ascii_formats_colored()
         } else {
             Self::ascii_formats()
         };
@@ -366,6 +395,8 @@ impl AppState {
             width: config.ascii.default_width,
             invert: false,
             edge_enhance: config.ascii.edge_enhance,
+                        color_mode: parse_color_support(&config.ascii.default_color)
+                            .unwrap_or(capabilities.color_support),
             selected_setting: 0,
         };
 
@@ -482,6 +513,7 @@ impl AppState {
                         charset: self.ascii_state.charset.clone(),
                         invert: self.ascii_state.invert,
                         edge_enhance: self.ascii_state.edge_enhance,
+                                            color_mode: self.ascii_state.color_mode,
                     },
                     RenderMode::ImageToUnicode => WorkerMessage::UnicodeRequest {
                         image,

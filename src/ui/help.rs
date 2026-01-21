@@ -120,7 +120,11 @@ fn create_help_text() -> Vec<Line<'static>> {
         ]),
         Line::from(vec![
             Span::styled("  Output Fmt  ", key_style),
-            Span::styled("ANSI/HTML/TXT/PNG/SVG (TXT only for ASCII)", desc_style),
+            Span::styled("ANSI/HTML/TXT/PNG/SVG (TXT hidden when colored)", desc_style),
+        ]),
+        Line::from(vec![
+            Span::styled("  Color Mode  ", key_style),
+            Span::styled("None/16/256/TrueColor (ASCII & Unicode)", desc_style),
         ]),
         Line::from(Span::styled("", Style::default())),
         Line::from(Span::styled("Preview Area", section_style)),
