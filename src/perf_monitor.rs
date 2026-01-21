@@ -11,6 +11,8 @@ pub struct PerfMetrics {
     pub fps: f32,
     pub avg_frame_time_ms: f32,
     pub last_render_time_ms: u64,
+    pub stream_enqueued_frames: u64,
+    pub stream_dropped_frames: u64,
 }
 
 impl PerfMetrics {
@@ -23,6 +25,8 @@ impl PerfMetrics {
             fps: 0.0,
             avg_frame_time_ms: 0.0,
             last_render_time_ms: 0,
+            stream_enqueued_frames: 0,
+            stream_dropped_frames: 0,
         }
     }
 
@@ -59,6 +63,16 @@ impl PerfMetrics {
     /// Check if performance is degraded (below 30 FPS)
     pub fn is_degraded(&self) -> bool {
         self.fps > 0.0 && self.fps < 30.0
+    }
+
+    /// Record a streamed frame enqueue event
+    pub fn record_stream_enqueue(&mut self) {
+        self.stream_enqueued_frames = self.stream_enqueued_frames.saturating_add(1);
+    }
+
+    /// Record a dropped stream frame
+    pub fn record_stream_drop(&mut self) {
+        self.stream_dropped_frames = self.stream_dropped_frames.saturating_add(1);
     }
 }
 

@@ -12,6 +12,7 @@ pub mod state;
 pub mod terminal_capabilities;
 pub mod ui;
 pub mod unicode_handler;
+pub mod video;
 pub mod worker;
 
 // Re-export commonly used types

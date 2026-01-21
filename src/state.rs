@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crossbeam_channel::Sender;
 use image::DynamicImage;
@@ -15,6 +16,7 @@ use crate::render_engines::{
     unicode::UnicodeMode,
 };
 use crate::terminal_capabilities::{ColorSupport, TerminalCapabilities};
+use crate::video::{FrameDropPolicy, FrameQueue, VideoFrame};
 use crate::worker::{WorkerMessage, WorkerResponse};
 /// Parse color support from config string
 fn parse_color_support(s: &str) -> Option<ColorSupport> {
@@ -292,6 +294,13 @@ pub struct AppState {
     // Preview control
     pub preview_output_format: OutputFormat,
 
+    // Streaming support
+    pub stream_enabled: bool,
+    pub stream_target_fps: u32,
+    pub stream_drop_policy: FrameDropPolicy,
+    pub stream_queue: FrameQueue,
+    stream_next_seq: u64,
+
     // Worker communication
     worker_tx: Sender<WorkerMessage>,
 }
@@ -440,6 +449,13 @@ impl AppState {
 
             // Default to ANSI output for terminal-first usage
             preview_output_format: OutputFormat::default(),
+
+            // Streaming defaults (disabled until a source is attached)
+            stream_enabled: false,
+            stream_target_fps: 30,
+            stream_drop_policy: FrameDropPolicy::DropOldest,
+            stream_queue: FrameQueue::default(),
+            stream_next_seq: 0,
 
             worker_tx,
         }
@@ -749,6 +765,49 @@ impl AppState {
                 self.set_status("Zoom not applicable for Text Stylizer", true);
             }
         }
+    }
+
+    /// Enable or disable streaming mode. When enabled, frames can be enqueued for playback.
+    pub fn set_streaming_enabled(&mut self, enabled: bool) {
+        self.stream_enabled = enabled;
+        let status = if enabled { "Streaming enabled" } else { "Streaming disabled" };
+        self.set_status(status, false);
+    }
+
+    /// Adjust target streaming FPS (clamped between 1 and 240)
+    pub fn set_stream_target_fps(&mut self, fps: u32) {
+        let clamped = fps.clamp(1, 240);
+        self.stream_target_fps = clamped;
+        self.set_status(&format!("Stream target FPS: {}", clamped), false);
+    }
+
+    /// Configure how frames are dropped when the queue is full
+    pub fn set_stream_drop_policy(&mut self, policy: FrameDropPolicy) {
+        self.stream_drop_policy = policy;
+        self.stream_queue.set_drop_policy(policy);
+    }
+
+    /// Enqueue a decoded frame for streaming; returns true if accepted
+    pub fn enqueue_stream_frame(&mut self, image: Arc<DynamicImage>, pts: Duration) -> bool {
+        let frame = VideoFrame {
+            image,
+            pts,
+            seq: self.stream_next_seq,
+        };
+        self.stream_next_seq = self.stream_next_seq.saturating_add(1);
+
+        let accepted = self.stream_queue.push(frame);
+        if accepted {
+            self.perf_metrics.record_stream_enqueue();
+        } else {
+            self.perf_metrics.record_stream_drop();
+        }
+        accepted
+    }
+
+    /// Pop the next frame from the streaming queue
+    pub fn pop_stream_frame(&mut self) -> Option<VideoFrame> {
+        self.stream_queue.pop()
     }
 }
 
