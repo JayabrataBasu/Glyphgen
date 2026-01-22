@@ -25,6 +25,24 @@ pub enum FrameDropPolicy {
     Block,
 }
 
+impl FrameDropPolicy {
+    pub fn name(&self) -> &'static str {
+        match self {
+            FrameDropPolicy::DropOldest => "DropOldest",
+            FrameDropPolicy::DropNewest => "DropNewest",
+            FrameDropPolicy::Block => "Block",
+        }
+    }
+
+    pub fn next(&self) -> Self {
+        match self {
+            FrameDropPolicy::DropOldest => FrameDropPolicy::DropNewest,
+            FrameDropPolicy::DropNewest => FrameDropPolicy::Block,
+            FrameDropPolicy::Block => FrameDropPolicy::DropOldest,
+        }
+    }
+}
+
 impl Default for FrameDropPolicy {
     fn default() -> Self {
         FrameDropPolicy::DropOldest

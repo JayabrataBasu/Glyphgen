@@ -45,6 +45,30 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
             state.show_help = true;
             return Ok(());
         }
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            if state.stream_enabled {
+                state.set_streaming_enabled(false);
+            } else if state.input_image.is_some() {
+                state.set_streaming_enabled(true);
+            } else {
+                state.set_status("Load an image before streaming", true);
+            }
+            return Ok(());
+        }
+        KeyCode::Char('[') => {
+            let new_fps = state.stream_target_fps.saturating_sub(5).max(1);
+            state.set_stream_target_fps(new_fps);
+            return Ok(());
+        }
+        KeyCode::Char(']') => {
+            let new_fps = (state.stream_target_fps + 5).min(240);
+            state.set_stream_target_fps(new_fps);
+            return Ok(());
+        }
+        KeyCode::Char('d') | KeyCode::Char('D') => {
+            state.cycle_stream_drop_policy();
+            return Ok(());
+        }
            KeyCode::Char('o') | KeyCode::Char('O') => { 
             // Cycle output format based on current mode
             let is_unicode = matches!(state.current_mode, RenderMode::ImageToUnicode);

@@ -242,6 +242,18 @@ fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
         state.perf_metrics.last_render_time_ms
     );
 
+    let stream_info = if state.stream_enabled {
+        format!(
+            " │ Stream On @{:>3} q:{:>2} drop:{} ({})",
+            state.stream_target_fps,
+            state.stream_queue.len(),
+            state.perf_metrics.stream_dropped_frames,
+            state.stream_drop_policy.name()
+        )
+    } else {
+        " │ Stream Off".to_string()
+    };
+
     let file_info = state
         .input_file
         .as_ref()
@@ -254,7 +266,7 @@ fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
 
     // Calculate spacing
     let status_len = state.status_message.len();
-    let info_len = perf_info.len() + file_info.len() + format_info.len();
+    let info_len = perf_info.len() + file_info.len() + format_info.len() + stream_info.len();
     let spacing = (area.width as usize)
         .saturating_sub(status_len)
         .saturating_sub(info_len)
@@ -267,6 +279,7 @@ fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
         Span::styled(&perf_info, Style::default().fg(Color::DarkGray)),
         Span::styled(&file_info, Style::default().fg(Color::Blue)),
         Span::styled(&format_info, Style::default().fg(Color::Magenta)),
+        Span::styled(&stream_info, Style::default().fg(Color::Green)),
         Span::raw(" "),
     ]);
 

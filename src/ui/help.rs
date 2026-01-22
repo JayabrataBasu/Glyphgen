@@ -59,6 +59,18 @@ fn create_help_text() -> Vec<Line<'static>> {
             Span::styled("Toggle help overlay", desc_style),
         ]),
         Line::from(vec![
+            Span::styled("  P           ", key_style),
+            Span::styled("Toggle streaming on/off", desc_style),
+        ]),
+        Line::from(vec![
+            Span::styled("  [ / ]       ", key_style),
+            Span::styled("Adjust stream target FPS", desc_style),
+        ]),
+        Line::from(vec![
+            Span::styled("  D           ", key_style),
+            Span::styled("Cycle stream drop policy", desc_style),
+        ]),
+        Line::from(vec![
             Span::styled("  Tab         ", key_style),
             Span::styled("Next widget", desc_style),
         ]),

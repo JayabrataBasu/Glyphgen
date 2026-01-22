@@ -808,6 +808,13 @@ impl AppState {
         self.stream_queue.set_drop_policy(policy);
     }
 
+    /// Cycle to next drop policy
+    pub fn cycle_stream_drop_policy(&mut self) {
+        let next = self.stream_drop_policy.next();
+        self.set_stream_drop_policy(next);
+        self.set_status(&format!("Stream drop policy: {}", next.name()), false);
+    }
+
     /// Enqueue a decoded frame for streaming; returns true if accepted
     pub fn enqueue_stream_frame(&mut self, image: Arc<DynamicImage>, pts: Duration) -> bool {
         let frame = VideoFrame {
@@ -847,40 +854,48 @@ impl AppState {
             return;
         }
 
-        if !self.stream_queue.is_empty() {
-            let wait = self.stream_pacer.time_until_next(now);
-            if !wait.is_zero() {
+        // If no frames are queued, opportunistically duplicate the current image as a frame.
+        // This is a temporary stub until real decoders feed the queue.
+        if self.stream_queue.is_empty() {
+            if let Some(img) = self.input_image.as_ref() {
+                let _ = self.enqueue_stream_frame(Arc::clone(img), Duration::from_secs(0));
+            } else {
                 return;
             }
+        }
 
-            if let Some(frame) = self.pop_stream_frame() {
-                self.stream_inflight = true;
+        let wait = self.stream_pacer.time_until_next(now);
+        if !wait.is_zero() {
+            return;
+        }
 
-                match self.current_mode {
-                    RenderMode::ImageToAscii => {
-                        let msg = WorkerMessage::StreamAsciiRequest {
-                            image: frame.image,
-                            width: self.ascii_state.width,
-                            charset: self.ascii_state.charset.clone(),
-                            invert: self.ascii_state.invert,
-                            edge_enhance: self.ascii_state.edge_enhance,
-                            color_mode: self.ascii_state.color_mode,
-                            seq: frame.seq,
-                        };
-                        let _ = self.worker_tx.send(msg);
-                    }
-                    RenderMode::ImageToUnicode => {
-                        let msg = WorkerMessage::StreamUnicodeRequest {
-                            image: frame.image,
-                            width: self.unicode_state.width,
-                            mode: self.unicode_state.mode,
-                            color_mode: self.unicode_state.color_mode,
-                            seq: frame.seq,
-                        };
-                        let _ = self.worker_tx.send(msg);
-                    }
-                    RenderMode::TextStylizer => {} // unreachable by earlier match
+        if let Some(frame) = self.pop_stream_frame() {
+            self.stream_inflight = true;
+
+            match self.current_mode {
+                RenderMode::ImageToAscii => {
+                    let msg = WorkerMessage::StreamAsciiRequest {
+                        image: frame.image,
+                        width: self.ascii_state.width,
+                        charset: self.ascii_state.charset.clone(),
+                        invert: self.ascii_state.invert,
+                        edge_enhance: self.ascii_state.edge_enhance,
+                        color_mode: self.ascii_state.color_mode,
+                        seq: frame.seq,
+                    };
+                    let _ = self.worker_tx.send(msg);
                 }
+                RenderMode::ImageToUnicode => {
+                    let msg = WorkerMessage::StreamUnicodeRequest {
+                        image: frame.image,
+                        width: self.unicode_state.width,
+                        mode: self.unicode_state.mode,
+                        color_mode: self.unicode_state.color_mode,
+                        seq: frame.seq,
+                    };
+                    let _ = self.worker_tx.send(msg);
+                }
+                RenderMode::TextStylizer => {} // unreachable by earlier match
             }
         }
     }
