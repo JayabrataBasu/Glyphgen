@@ -65,6 +65,26 @@ pub fn render_ascii_controls(frame: &mut Frame, area: Rect, state: &AppState, is
     lines.push(create_action_line("[L]", "Load Image"));
     lines.push(create_action_line("[S]", "Save Output"));
 
+    // Streaming quick toggles
+    lines.push(create_setting_line(
+        "Streaming",
+        if state.stream_enabled { "On" } else { "Off" },
+        false,
+        Some("[P]"),
+    ));
+    lines.push(create_setting_line(
+        "Stream FPS",
+        &format!("{}", state.stream_target_fps),
+        false,
+        Some("[[/]]"),
+    ));
+    lines.push(create_setting_line(
+        "Drop Policy",
+        state.stream_drop_policy.name(),
+        false,
+        Some("[D]"),
+    ));
+
     // Output format
     lines.push(create_setting_line(
         "Output Format",
@@ -119,6 +139,26 @@ pub fn render_unicode_controls(frame: &mut Frame, area: Rect, state: &AppState, 
     lines.push(create_action_line("[Space]", "Render"));
     lines.push(create_action_line("[L]", "Load Image"));
     lines.push(create_action_line("[S]", "Save Output"));
+
+    // Streaming quick toggles
+    lines.push(create_setting_line(
+        "Streaming",
+        if state.stream_enabled { "On" } else { "Off" },
+        false,
+        Some("[P]"),
+    ));
+    lines.push(create_setting_line(
+        "Stream FPS",
+        &format!("{}", state.stream_target_fps),
+        false,
+        Some("[[/]]"),
+    ));
+    lines.push(create_setting_line(
+        "Drop Policy",
+        state.stream_drop_policy.name(),
+        false,
+        Some("[D]"),
+    ));
 
     // Output format
     lines.push(create_setting_line(

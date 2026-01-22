@@ -29,6 +29,15 @@ fn parse_color_support(s: &str) -> Option<ColorSupport> {
     }
 }
 
+fn parse_drop_policy(s: &str) -> Option<FrameDropPolicy> {
+    match s.to_lowercase().as_str() {
+        "dropoldest" | "oldest" => Some(FrameDropPolicy::DropOldest),
+        "dropnewest" | "newest" => Some(FrameDropPolicy::DropNewest),
+        "block" => Some(FrameDropPolicy::Block),
+        _ => None,
+    }
+}
+
 
 /// Main render mode selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -418,6 +427,11 @@ impl AppState {
             selected_setting: 0,
         };
 
+        let stream_enabled = config.streaming.enabled;
+        let stream_target_fps = config.streaming.target_fps.clamp(1, 240);
+        let stream_drop_policy =
+            parse_drop_policy(&config.streaming.drop_policy).unwrap_or(FrameDropPolicy::DropOldest);
+
         Self {
             current_mode: RenderMode::default(),
             focus: FocusedWidget::default(),
@@ -452,13 +466,13 @@ impl AppState {
             // Default to ANSI output for terminal-first usage
             preview_output_format: OutputFormat::default(),
 
-            // Streaming defaults (disabled until a source is attached)
-            stream_enabled: false,
-            stream_target_fps: 30,
-            stream_drop_policy: FrameDropPolicy::DropOldest,
+            // Streaming defaults (pull from config; disabled until a source is attached)
+            stream_enabled,
+            stream_target_fps,
+            stream_drop_policy,
             stream_queue: FrameQueue::default(),
             stream_inflight: false,
-            stream_pacer: FramePacer::new(30),
+            stream_pacer: FramePacer::new(stream_target_fps),
             stream_next_seq: 0,
 
             worker_tx,
@@ -790,6 +804,7 @@ impl AppState {
         self.stream_enabled = enabled;
         self.stream_inflight = false;
         self.stream_pacer.reset();
+        self.config.streaming.enabled = enabled;
         let status = if enabled { "Streaming enabled" } else { "Streaming disabled" };
         self.set_status(status, false);
     }
@@ -799,6 +814,7 @@ impl AppState {
         let clamped = fps.clamp(1, 240);
         self.stream_target_fps = clamped;
         self.stream_pacer = FramePacer::new(clamped);
+        self.config.streaming.target_fps = clamped;
         self.set_status(&format!("Stream target FPS: {}", clamped), false);
     }
 
@@ -806,6 +822,7 @@ impl AppState {
     pub fn set_stream_drop_policy(&mut self, policy: FrameDropPolicy) {
         self.stream_drop_policy = policy;
         self.stream_queue.set_drop_policy(policy);
+        self.config.streaming.drop_policy = policy.name().to_string();
     }
 
     /// Cycle to next drop policy

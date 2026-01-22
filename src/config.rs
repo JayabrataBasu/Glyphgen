@@ -16,6 +16,8 @@ pub struct Config {
     pub unicode: UnicodePreferences,
     pub text: TextPreferences,
     pub ui: UiPreferences,
+    #[serde(default)]
+    pub streaming: StreamingPreferences,
 }
 
 impl Default for Config {
@@ -25,6 +27,7 @@ impl Default for Config {
             unicode: UnicodePreferences::default(),
             text: TextPreferences::default(),
             ui: UiPreferences::default(),
+            streaming: StreamingPreferences::default(),
         }
     }
 }
@@ -135,6 +138,39 @@ impl Default for UiPreferences {
             word_wrap: false,
         }
     }
+}
+
+/// Streaming preferences
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingPreferences {
+    #[serde(default = "default_stream_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_stream_target_fps")]
+    pub target_fps: u32,
+    #[serde(default = "default_stream_drop_policy")]
+    pub drop_policy: String,
+}
+
+impl Default for StreamingPreferences {
+    fn default() -> Self {
+        Self {
+            enabled: default_stream_enabled(),
+            target_fps: default_stream_target_fps(),
+            drop_policy: default_stream_drop_policy(),
+        }
+    }
+}
+
+fn default_stream_enabled() -> bool {
+    false
+}
+
+fn default_stream_target_fps() -> u32 {
+    30
+}
+
+fn default_stream_drop_policy() -> String {
+    "DropOldest".to_string()
 }
 
 #[cfg(test)]
