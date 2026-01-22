@@ -135,6 +135,11 @@ impl FramePacer {
     pub fn target_frame(&self) -> Duration {
         self.target_frame
     }
+
+    /// Reset pacing history (e.g., when starting/stopping playback)
+    pub fn reset(&mut self) {
+        self.last_frame = None;
+    }
 }
 
 #[cfg(test)]

@@ -168,6 +168,9 @@ fn run_event_loop(
             app_state.handle_worker_response(response);
         }
 
+        // Progress streaming playback if enabled
+        app_state.process_streaming_tick(Instant::now());
+
         // Record frame time for performance monitoring
         let frame_time = frame_start.elapsed();
         app_state.perf_metrics.record_frame(frame_time);
@@ -295,6 +298,9 @@ fn run_render_once(
                 };
                 std::fs::write(out_file, content)?;
                 println!("Saved text output to {} ({}ms)", out_file, render_time);
+            }
+            glyphgen::worker::WorkerResponse::StreamComplete { .. } => {
+                eprintln!("Unexpected streaming response during render-once");
             }
             glyphgen::worker::WorkerResponse::Error(err) => {
                 eprintln!("Render error: {}", err);

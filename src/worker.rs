@@ -26,12 +26,30 @@ pub enum WorkerMessage {
         edge_enhance: bool,
         color_mode: ColorSupport,
     },
+    /// Request ASCII rendering for streaming (includes sequence id)
+    StreamAsciiRequest {
+        image: Arc<DynamicImage>,
+        width: usize,
+        charset: CharacterSet,
+        invert: bool,
+        edge_enhance: bool,
+        color_mode: ColorSupport,
+        seq: u64,
+    },
     /// Request Unicode rendering
     UnicodeRequest {
         image: Arc<DynamicImage>,
         width: usize,
         mode: UnicodeMode,
         color_mode: ColorSupport,
+    },
+    /// Request Unicode rendering for streaming (includes sequence id)
+    StreamUnicodeRequest {
+        image: Arc<DynamicImage>,
+        width: usize,
+        mode: UnicodeMode,
+        color_mode: ColorSupport,
+        seq: u64,
     },
     /// Request text stylization
     TextRequest {
@@ -52,6 +70,8 @@ pub enum WorkerResponse {
     AsciiComplete { output: String, render_time: u64 },
     /// Unicode rendering complete
     UnicodeComplete { output: String, render_time: u64 },
+    /// Streaming render complete with sequence id for deduplication/order tracking
+    StreamComplete { output: String, render_time: u64, seq: u64 },
     /// Text stylization complete
     TextComplete { output: String, render_time: u64 },
     /// Error occurred
@@ -146,6 +166,37 @@ fn worker_loop(rx: Receiver<WorkerMessage>, tx: Sender<WorkerResponse>) {
                 let _ = tx.send(response);
             }
 
+            WorkerMessage::StreamAsciiRequest {
+                image,
+                width,
+                charset,
+                invert,
+                edge_enhance,
+                color_mode,
+                seq,
+            } => {
+                let start = Instant::now();
+
+                let config = AsciiConfig {
+                    target_width: width,
+                                        color_mode,
+                    charset,
+                    invert,
+                    edge_enhance,
+                };
+
+                let response = match render_ascii(&image, &config) {
+                    Ok(output) => WorkerResponse::StreamComplete {
+                        output,
+                        render_time: start.elapsed().as_millis() as u64,
+                        seq,
+                    },
+                    Err(e) => WorkerResponse::Error(e.to_string()),
+                };
+
+                let _ = tx.send(response);
+            }
+
             WorkerMessage::UnicodeRequest {
                 image,
                 width,
@@ -164,6 +215,33 @@ fn worker_loop(rx: Receiver<WorkerMessage>, tx: Sender<WorkerResponse>) {
                     Ok(output) => WorkerResponse::UnicodeComplete {
                         output,
                         render_time: start.elapsed().as_millis() as u64,
+                    },
+                    Err(e) => WorkerResponse::Error(e.to_string()),
+                };
+
+                let _ = tx.send(response);
+            }
+
+            WorkerMessage::StreamUnicodeRequest {
+                image,
+                width,
+                mode,
+                color_mode,
+                seq,
+            } => {
+                let start = Instant::now();
+
+                let config = UnicodeConfig {
+                    target_width: width,
+                    mode,
+                    color_mode,
+                };
+
+                let response = match render_unicode(&image, &config) {
+                    Ok(output) => WorkerResponse::StreamComplete {
+                        output,
+                        render_time: start.elapsed().as_millis() as u64,
+                        seq,
                     },
                     Err(e) => WorkerResponse::Error(e.to_string()),
                 };
@@ -269,6 +347,38 @@ mod tests {
             WorkerResponse::TextComplete { output, .. } => {
                 assert!(!output.is_empty());
                 assert!(output.contains('𝐇'));
+            }
+            _ => panic!("Unexpected response type"),
+        }
+
+        workers.shutdown();
+    }
+
+    #[test]
+    fn test_stream_unicode_request() {
+        let workers = spawn_workers();
+
+        let img = Arc::new(DynamicImage::ImageRgb8(RgbImage::new(10, 10)));
+
+        workers
+            .request_tx
+            .send(WorkerMessage::StreamUnicodeRequest {
+                image: img,
+                width: 10,
+                mode: UnicodeMode::HalfBlocks,
+                color_mode: ColorSupport::NoColor,
+                seq: 42,
+            })
+            .unwrap();
+
+        let response = workers
+            .response_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+
+        match response {
+            WorkerResponse::StreamComplete { seq, .. } => {
+                assert_eq!(seq, 42);
             }
             _ => panic!("Unexpected response type"),
         }

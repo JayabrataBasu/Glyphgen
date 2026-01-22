@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use image::DynamicImage;
@@ -16,7 +16,7 @@ use crate::render_engines::{
     unicode::UnicodeMode,
 };
 use crate::terminal_capabilities::{ColorSupport, TerminalCapabilities};
-use crate::video::{FrameDropPolicy, FrameQueue, VideoFrame};
+use crate::video::{FrameDropPolicy, FramePacer, FrameQueue, VideoFrame};
 use crate::worker::{WorkerMessage, WorkerResponse};
 /// Parse color support from config string
 fn parse_color_support(s: &str) -> Option<ColorSupport> {
@@ -299,6 +299,8 @@ pub struct AppState {
     pub stream_target_fps: u32,
     pub stream_drop_policy: FrameDropPolicy,
     pub stream_queue: FrameQueue,
+    pub stream_inflight: bool,
+    pub stream_pacer: FramePacer,
     stream_next_seq: u64,
 
     // Worker communication
@@ -455,6 +457,8 @@ impl AppState {
             stream_target_fps: 30,
             stream_drop_policy: FrameDropPolicy::DropOldest,
             stream_queue: FrameQueue::default(),
+            stream_inflight: false,
+            stream_pacer: FramePacer::new(30),
             stream_next_seq: 0,
 
             worker_tx,
@@ -566,28 +570,42 @@ impl AppState {
 
     /// Handle response from worker thread
     pub fn handle_worker_response(&mut self, response: WorkerResponse) {
-        self.is_rendering = false;
-
         match response {
+            WorkerResponse::StreamComplete {
+                output,
+                render_time,
+                seq: _,
+            } => {
+                // Streaming updates should not reset scroll; keep preview stable
+                self.preview_content = Some(output);
+                self.perf_metrics.last_render_time_ms = render_time;
+                self.stream_inflight = false;
+                self.stream_pacer.mark_presented(Instant::now());
+            }
             WorkerResponse::AsciiComplete { output, render_time } => {
+                self.is_rendering = false;
                 self.preview_content = Some(output);
                 self.reset_scroll();
                 self.perf_metrics.last_render_time_ms = render_time;
                 self.set_status(&format!("Rendered in {}ms", render_time), false);
             }
             WorkerResponse::UnicodeComplete { output, render_time } => {
+                self.is_rendering = false;
                 self.preview_content = Some(output);
                 self.reset_scroll();
                 self.perf_metrics.last_render_time_ms = render_time;
                 self.set_status(&format!("Rendered in {}ms", render_time), false);
             }
             WorkerResponse::TextComplete { output, render_time } => {
+                self.is_rendering = false;
                 self.preview_content = Some(output);
                 self.reset_scroll();
                 self.perf_metrics.last_render_time_ms = render_time;
                 self.set_status(&format!("Stylized in {}ms", render_time), false);
             }
             WorkerResponse::Error(err) => {
+                self.is_rendering = false;
+                self.stream_inflight = false;
                 self.set_status(&format!("Error: {}", err), true);
             }
         }
@@ -770,6 +788,8 @@ impl AppState {
     /// Enable or disable streaming mode. When enabled, frames can be enqueued for playback.
     pub fn set_streaming_enabled(&mut self, enabled: bool) {
         self.stream_enabled = enabled;
+        self.stream_inflight = false;
+        self.stream_pacer.reset();
         let status = if enabled { "Streaming enabled" } else { "Streaming disabled" };
         self.set_status(status, false);
     }
@@ -778,6 +798,7 @@ impl AppState {
     pub fn set_stream_target_fps(&mut self, fps: u32) {
         let clamped = fps.clamp(1, 240);
         self.stream_target_fps = clamped;
+        self.stream_pacer = FramePacer::new(clamped);
         self.set_status(&format!("Stream target FPS: {}", clamped), false);
     }
 
@@ -808,6 +829,60 @@ impl AppState {
     /// Pop the next frame from the streaming queue
     pub fn pop_stream_frame(&mut self) -> Option<VideoFrame> {
         self.stream_queue.pop()
+    }
+
+    /// Called each UI frame to progress streaming playback.
+    /// Uses the pacing helper to avoid overshooting target FPS and prevents multiple in-flight renders.
+    pub fn process_streaming_tick(&mut self, now: Instant) {
+        if !self.stream_enabled {
+            return;
+        }
+
+        // Only image modes support streaming renders
+        if !matches!(self.current_mode, RenderMode::ImageToAscii | RenderMode::ImageToUnicode) {
+            return;
+        }
+
+        if self.stream_inflight {
+            return;
+        }
+
+        if !self.stream_queue.is_empty() {
+            let wait = self.stream_pacer.time_until_next(now);
+            if !wait.is_zero() {
+                return;
+            }
+
+            if let Some(frame) = self.pop_stream_frame() {
+                self.stream_inflight = true;
+
+                match self.current_mode {
+                    RenderMode::ImageToAscii => {
+                        let msg = WorkerMessage::StreamAsciiRequest {
+                            image: frame.image,
+                            width: self.ascii_state.width,
+                            charset: self.ascii_state.charset.clone(),
+                            invert: self.ascii_state.invert,
+                            edge_enhance: self.ascii_state.edge_enhance,
+                            color_mode: self.ascii_state.color_mode,
+                            seq: frame.seq,
+                        };
+                        let _ = self.worker_tx.send(msg);
+                    }
+                    RenderMode::ImageToUnicode => {
+                        let msg = WorkerMessage::StreamUnicodeRequest {
+                            image: frame.image,
+                            width: self.unicode_state.width,
+                            mode: self.unicode_state.mode,
+                            color_mode: self.unicode_state.color_mode,
+                            seq: frame.seq,
+                        };
+                        let _ = self.worker_tx.send(msg);
+                    }
+                    RenderMode::TextStylizer => {} // unreachable by earlier match
+                }
+            }
+        }
     }
 }
 
