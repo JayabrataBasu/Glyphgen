@@ -40,6 +40,7 @@ fn main() -> Result<()> {
 
     // Simple CLI parsing for convenience
     let mut arg_image: Option<std::path::PathBuf> = None;
+    let mut arg_video: Option<std::path::PathBuf> = None;
     let mut arg_render_once = false;
     let mut arg_mode: Option<String> = None;
     let mut arg_output_format: Option<String> = None;
@@ -50,6 +51,11 @@ fn main() -> Result<()> {
             "--image" => {
                 if let Some(p) = iter.next() {
                     arg_image = Some(std::path::PathBuf::from(p));
+                }
+            }
+            "--video" => {
+                if let Some(p) = iter.next() {
+                    arg_video = Some(std::path::PathBuf::from(p));
                 }
             }
             "--render-once" => arg_render_once = true,
@@ -89,6 +95,17 @@ fn main() -> Result<()> {
 
     // Create application state
     let mut app_state = AppState::new(config, capabilities, workers.request_tx.clone());
+
+    // If a video path was provided, load it and enable streaming
+    if let Some(video_path) = arg_video {
+        match glyphgen::image_loader::load_video_or_image(&video_path) {
+            Ok(source) => {
+                app_state.set_streaming_source(source);
+                app_state.set_streaming_enabled(true);
+            }
+            Err(e) => eprintln!("Failed to load video: {}", e),
+        }
+    }
 
     // If an image path was provided, set it (this will auto-render)
     if let Some(path) = arg_image {

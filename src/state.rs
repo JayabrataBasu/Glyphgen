@@ -816,7 +816,7 @@ impl AppState {
         self.stream_inflight = false;
         self.stream_pacer.reset();
 
-        // If enabling and we have an image, create a static source
+        // If enabling and we have a source, prepare it
         if enabled && self.stream_source.is_none() {
             if let Some(img) = self.input_image.as_ref() {
                 let source = StaticImageSource::new(Arc::clone(img), self.stream_target_fps as f64);
@@ -828,8 +828,14 @@ impl AppState {
         }
 
         self.config.streaming.enabled = enabled;
-        let status = if enabled { "Streaming enabled" } else { "Streaming disabled" };
+        let status = if enabled { "Streaming enabled - [P] to pause" } else { "Streaming disabled" };
         self.set_status(status, false);
+    }
+
+    /// Set the streaming source (video decoder or frame sequence)
+    pub fn set_streaming_source(&mut self, source: Box<dyn FrameSource>) {
+        self.stream_source = Some(source);
+        self.set_status("Video loaded - [P] to play", false);
     }
 
     /// Adjust target streaming FPS (clamped between 1 and 240)
