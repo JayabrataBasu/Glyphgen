@@ -10,6 +10,7 @@ use crossbeam_channel::Sender;
 use image::DynamicImage;
 
 use crate::config::Config;
+use crate::decoder::{FrameSource, StaticImageSource};
 use crate::perf_monitor::PerfMetrics;
 use crate::render_engines::{
     ascii::CharacterSet, text_stylizer::GradientMode, text_stylizer::UnicodeStyle,
@@ -311,6 +312,7 @@ pub struct AppState {
     pub stream_inflight: bool,
     pub stream_pacer: FramePacer,
     stream_next_seq: u64,
+    stream_source: Option<Box<dyn FrameSource>>,
 
     // Worker communication
     worker_tx: Sender<WorkerMessage>,
@@ -473,6 +475,7 @@ impl AppState {
             stream_queue: FrameQueue::default(),
             stream_inflight: false,
             stream_pacer: FramePacer::new(stream_target_fps),
+            stream_source: None,
             stream_next_seq: 0,
 
             worker_tx,
@@ -516,6 +519,14 @@ impl AppState {
         self.load_prompt_active = false;
         self.load_prompt_input.clear();
         self.load_prompt_error = None;
+
+        // Update streaming source if streaming is enabled
+        if self.stream_enabled {
+            if let Some(img) = self.input_image.as_ref() {
+                let source = StaticImageSource::new(Arc::clone(img), self.stream_target_fps as f64);
+                self.stream_source = Some(Box::new(source));
+            }
+        }
 
         // Auto-render after loading
         self.trigger_render();
@@ -804,6 +815,18 @@ impl AppState {
         self.stream_enabled = enabled;
         self.stream_inflight = false;
         self.stream_pacer.reset();
+
+        // If enabling and we have an image, create a static source
+        if enabled && self.stream_source.is_none() {
+            if let Some(img) = self.input_image.as_ref() {
+                let source = StaticImageSource::new(Arc::clone(img), self.stream_target_fps as f64);
+                self.stream_source = Some(Box::new(source));
+            }
+        } else if !enabled {
+            // Clear source when disabling
+            self.stream_source = None;
+        }
+
         self.config.streaming.enabled = enabled;
         let status = if enabled { "Streaming enabled" } else { "Streaming disabled" };
         self.set_status(status, false);
@@ -871,16 +894,38 @@ impl AppState {
             return;
         }
 
-        // If no frames are queued, opportunistically duplicate the current image as a frame.
-        // This is a temporary stub until real decoders feed the queue.
-        if self.stream_queue.is_empty() {
-            if let Some(img) = self.input_image.as_ref() {
-                let _ = self.enqueue_stream_frame(Arc::clone(img), Duration::from_secs(0));
-            } else {
-                return;
+        // Decode frames from source and fill queue if space available
+        // Collect frames first to avoid mutable borrow conflicts
+        let mut frames_to_enqueue = Vec::new();
+        if let Some(source) = self.stream_source.as_mut() {
+            while self.stream_queue.len() + frames_to_enqueue.len() < self.stream_queue.capacity() / 2 {
+                match source.next_frame() {
+                    Ok(Some((img, pts))) => {
+                        frames_to_enqueue.push((img, pts));
+                    }
+                    Ok(None) => {
+                        // Source exhausted, try to loop if supported
+                        if source.can_loop() {
+                            let _ = source.reset();
+                        } else {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        self.set_status(&format!("Decode error: {}", e), true);
+                        self.set_streaming_enabled(false);
+                        return;
+                    }
+                }
             }
         }
 
+        // Enqueue collected frames
+        for (img, pts) in frames_to_enqueue {
+            let _ = self.enqueue_stream_frame(img, pts);
+        }
+
+        // Check pacing before dispatching render
         let wait = self.stream_pacer.time_until_next(now);
         if !wait.is_zero() {
             return;

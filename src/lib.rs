@@ -4,6 +4,7 @@
 
 pub mod color_space;
 pub mod config;
+pub mod decoder;
 pub mod image_loader;
 pub mod input;
 pub mod perf_monitor;
